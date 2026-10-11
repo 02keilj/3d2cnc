@@ -1,0 +1,1402 @@
+<title>3D2CNC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: fixed-width control rail on the left, full-height stage (3D / sheets / parts) on the right; stacks on phones. */
+:root{
+  --bg:#e9ecea; --rail:#f6f7f6; --ink:#17201c; --muted:#5a6862; --line:#d0d7d3; --field:#ffffff;
+  --accent:#1d7a55; --accent-ink:#ffffff; --warn:#a85a12; --warn-bg:#fbefe1;
+  --mat:#1c4b3d; --mat-grid:rgba(255,255,255,.07); --mat-grid2:rgba(255,255,255,.16);
+  --ply:#e3c28c; --ply-edge:#6e4f27; --ply-b:#c39257; --ply-k:#a9c3cf; --keep:#d9822b; --sel:#ffd84a;
+  --display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111614; --rail:#181e1b; --ink:#e2e8e4; --muted:#8e9c95; --line:#2b3430; --field:#101412;
+  --accent:#3dbd88; --accent-ink:#0c1511; --warn:#e9a25a; --warn-bg:#2b2016;
+  --mat:#173f33; --mat-grid:rgba(255,255,255,.06); --mat-grid2:rgba(255,255,255,.13); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111614; --rail:#181e1b; --ink:#e2e8e4; --muted:#8e9c95; --line:#2b3430; --field:#101412;
+  --accent:#3dbd88; --accent-ink:#0c1511; --warn:#e9a25a; --warn-bg:#2b2016;
+  --mat:#173f33; --mat-grid:rgba(255,255,255,.06); --mat-grid2:rgba(255,255,255,.13); color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-columns:330px minmax(0,1fr);height:100%}
+.rail{background:var(--rail);border-right:1px solid var(--line);overflow-y:auto;padding:18px 18px 28px;display:flex;flex-direction:column;gap:18px}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand h1{font-family:var(--display);font-weight:700;font-size:30px;letter-spacing:.01em;margin:0;line-height:1}
+.brand h1 span{color:var(--accent)}
+.brandrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.seg.theme span{padding:3px 8px;font-size:11.5px}
+.brand p{margin:0;color:var(--muted);font-size:12.5px}
+section.grp{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+section.grp>h2{margin:0;font-family:var(--display);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f>span{font-size:12px;color:var(--muted)}
+.in{display:flex;align-items:center;background:var(--field);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.in:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+.in input,.in select{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:500 13.5px var(--mono);padding:7px 8px;outline:none;font-variant-numeric:tabular-nums}
+.in select{font-family:var(--body);font-weight:500}
+.in i{font-style:normal;font-size:11.5px;color:var(--muted);padding-right:8px;font-family:var(--mono)}
+.seg{display:flex;background:var(--field);border:1px solid var(--line);border-radius:7px;padding:2px;gap:2px}
+.seg label{flex:1;position:relative}
+.seg input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.seg span{display:block;text-align:center;padding:6px 4px;border-radius:5px;font-size:12.5px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg input:checked+span{background:var(--accent);color:var(--accent-ink)}
+.seg input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px}
+.chk input{accent-color:var(--accent);width:16px;height:16px}
+.btn{font:600 13px var(--body);border:1px solid var(--line);background:var(--field);color:var(--ink);border-radius:6px;padding:7px 10px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:12px;text-align:center;color:var(--muted);font-size:12.5px;cursor:pointer}
+.drop:hover,.drop.over{border-color:var(--accent);color:var(--ink)}
+.drop b{color:var(--ink);font-weight:600}
+.dims{font:500 12.5px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.stage{display:flex;flex-direction:column;min-width:0;min-height:0}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--rail)}
+.tabs{display:flex;gap:4px}
+.tabs button{font:600 14px var(--display);letter-spacing:.04em;text-transform:uppercase;background:none;border:0;color:var(--muted);padding:6px 10px;border-radius:6px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--ink);background:var(--bg);box-shadow:inset 0 -2px 0 var(--accent)}
+.tabs button:focus-visible{outline:2px solid var(--accent)}
+.stats{display:flex;flex-wrap:wrap;gap:4px 18px;margin-left:auto}
+.stat{display:flex;align-items:baseline;gap:6px}
+.stat b{font:500 15px var(--mono);font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.views{flex:1;position:relative;min-height:0}
+[hidden]{display:none!important}
+.view{position:absolute;inset:0;overflow:auto;background:var(--bg)}
+#v3d{overflow:hidden}
+#cv{width:100%;height:100%;display:block;touch-action:none}
+.ovl{position:absolute;left:12px;bottom:12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;background:color-mix(in srgb,var(--rail) 88%,transparent);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12.5px;max-width:calc(100% - 24px)}
+.ovl input[type=range]{accent-color:var(--accent);width:120px}
+.legend{display:flex;gap:10px;align-items:center}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;margin-right:4px;border:1px solid var(--ply-edge)}
+.busy{position:absolute;top:12px;right:12px;font:500 12px var(--mono);background:var(--rail);border:1px solid var(--line);padding:4px 8px;border-radius:6px}
+#vsheets{padding:16px;display:flex;flex-direction:column;gap:22px}
+.sheet h3{margin:0 0 6px;font:600 14px var(--display);letter-spacing:.05em;text-transform:uppercase;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.sheet h3 small{font:400 12px var(--mono);color:var(--muted);text-transform:none;letter-spacing:0}
+.sheet .wrap{overflow-x:auto;border-radius:6px}
+.sheet svg{display:block;width:100%;height:auto;min-width:480px}
+.sheet svg .part{cursor:pointer}
+#vparts{padding:16px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font:600 11px var(--body);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:6px 10px;border-bottom:1px solid var(--line);position:sticky;top:-16px;background:var(--bg)}
+td{padding:6px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+td.n{font-family:var(--mono)}
+tr.sel td{background:color-mix(in srgb,var(--sel) 30%,transparent)}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.assy{max-width:68ch;margin:0 0 16px;color:var(--muted)}
+.warns{display:flex;flex-direction:column;gap:4px;padding:8px 16px;background:var(--warn-bg);color:var(--warn);font-size:12.5px;border-top:1px solid var(--line)}
+.warns:empty{display:none}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+.bodies{display:flex;flex-direction:column;gap:6px}
+.body{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;align-items:baseline;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--field)}
+.body b{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.body small{font:400 11.5px var(--mono);color:var(--muted);white-space:nowrap}
+.body .in{grid-column:1/-1;grid-row:2}
+.body.keep{border-color:var(--keep)}
+.sub{display:flex;flex-direction:column;gap:10px}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;height:auto}
+  .rail{border-right:0;border-bottom:1px solid var(--line)}
+  .stage{height:78vh;min-height:460px}
+  .stats{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+
+<div class="app">
+<aside class="rail">
+  <div class="brand"><div class="brandrow"><h1>3D<span>2</span>CNC</h1>
+    <div class="seg theme" role="radiogroup" aria-label="Colour theme">
+      <label><input type="radio" name="theme" value="auto" checked><span>Auto</span></label>
+      <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+      <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+    </div></div><p>Slice a 3D model into flat parts that slot together. Exports DXF and SVG per sheet.</p></div>
+
+  <section class="grp">
+    <h2>Model</h2>
+    <label class="drop" id="drop" for="file"><b>Load STL, OBJ or 3MF</b><br>or drop a file onto the viewer</label>
+    <input type="file" id="file" accept=".stl,.obj,.3mf" hidden>
+    <div class="f"><span>Sample model</span><div class="in"><select id="sample"><option value="island">Volcanic island (terrain)</option><option value="pot">Pot with inset lid (radial + keep-out)</option><option value="blob">Organic blob</option><option value="vase">Turned vase</option></select></div></div>
+    <div class="f"><span>Rotate model 90°</span><div class="btns"><button class="btn" data-rot="x" type="button">About X</button><button class="btn" data-rot="y" type="button">About Y</button><button class="btn" data-rot="z" type="button">About Z</button></div></div>
+    <div class="row">
+      <div class="f"><span>Scale</span><div class="in"><select id="fitAxis"><option value="file">File size (mm)</option><option value="0">Fit width X</option><option value="1">Fit depth Y</option><option value="2">Fit height Z</option></select></div></div>
+      <div class="f"><span>Size</span><div class="in"><input id="fitVal" type="number" min="10" step="1" value="300"><i>mm</i></div></div>
+    </div>
+    <div class="dims" id="dims">–</div>
+  </section>
+
+  <section class="grp">
+    <h2>Bodies</h2>
+    <div class="bodies" id="bodies"></div>
+    <div class="f" id="keepRow"><span>Keep-out clearance</span><div class="in"><input id="keepClear" type="number" min="0" step="0.1" value="0.5"><i>mm</i></div></div>
+  </section>
+
+  <section class="grp">
+    <h2>Construction</h2>
+    <div class="seg" role="radiogroup" aria-label="Method">
+      <label><input type="radio" name="method" value="interlock" checked><span>Crate</span></label>
+      <label><input type="radio" name="method" value="radial"><span>Radial</span></label>
+      <label><input type="radio" name="method" value="stack"><span>Stacked</span></label>
+    </div>
+    <div class="sub crate-only">
+      <div class="f"><span>Slice directions</span><div class="in"><select id="pair"><option value="0,1">A ⟂ X, B ⟂ Y (upright crate)</option><option value="0,2">A ⟂ X, B ⟂ Z</option><option value="1,2">A ⟂ Y, B ⟂ Z</option></select></div></div>
+      <div class="row">
+        <div class="f"><span>A panels</span><div class="in"><input id="countA" type="number" min="1" max="80" value="9"><i>pcs</i></div></div>
+        <div class="f"><span>B panels</span><div class="in"><input id="countB" type="number" min="1" max="80" value="9"><i>pcs</i></div></div>
+      </div>
+      <div class="f"><span>Assembly direction</span><div class="seg" role="radiogroup" aria-label="Assembly direction">
+        <label><input type="radio" name="flip" value="0" checked><span>B drops onto A</span></label>
+        <label><input type="radio" name="flip" value="1"><span>A drops onto B</span></label>
+      </div></div>
+    </div>
+    <div class="sub rad-only" hidden>
+      <div class="row">
+        <div class="f"><span>Radial fins (R)</span><div class="in"><input id="fins" type="number" min="2" max="72" value="12"><i>pcs</i></div></div>
+        <div class="f"><span>Horizontal rings (H)</span><div class="in"><input id="rings" type="number" min="1" max="80" value="6"><i>pcs</i></div></div>
+      </div>
+      <div class="f"><span>Hub radius (0 = smallest that clears)</span><div class="in"><input id="hub" type="number" min="0" step="1" value="0"><i>mm</i></div></div>
+      <p class="hint">Fins radiate around the vertical axis through the model's centre. Rotate the model to change the axis.</p>
+    </div>
+    <div class="f stk-only" hidden><span>Layer axis</span><div class="in"><select id="stackAxis"><option value="2">Layers ⟂ Z (horizontal)</option><option value="0">Layers ⟂ X</option><option value="1">Layers ⟂ Y</option></select></div></div>
+    <label class="chk join-only"><input type="checkbox" id="dropLoose" checked>Remove parts with no joints</label>
+    <div class="f"><span>Minimum part size (area of a square this wide)</span><div class="in"><input id="minSize" type="number" min="0" step="1" value="20"><i>mm</i></div></div>
+  </section>
+
+  <section class="grp">
+    <h2>Material</h2>
+    <div class="row">
+      <div class="f"><span>Stock thickness</span><div class="in"><input id="thick" type="number" min="0.5" step="0.1" value="6"><i>mm</i></div></div>
+      <div class="f join-only"><span>Slot clearance</span><div class="in"><input id="clear" type="number" min="0" step="0.05" value="0.2"><i>mm</i></div></div>
+    </div>
+  </section>
+
+  <section class="grp">
+    <h2>Cutting</h2>
+    <div class="seg" role="radiogroup" aria-label="Machine">
+      <label><input type="radio" name="machine" value="cnc" checked><span>CNC router</span></label>
+      <label><input type="radio" name="machine" value="laser"><span>Laser</span></label>
+    </div>
+    <div class="row cnc-only">
+      <div class="f"><span>Bit diameter</span><div class="in"><input id="bit" type="number" min="0.1" step="0.05" value="3.175"><i>mm</i></div></div>
+      <div class="f join-only"><span>Corner relief</span><div class="in"><select id="relief"><option value="dogbone">Dogbone</option><option value="tdepth">T-bone (deeper)</option><option value="tside">T-bone (wider)</option><option value="none">None</option></select></div></div>
+    </div>
+    <div class="row laser-only" hidden>
+      <div class="f"><span>Kerf</span><div class="in"><input id="kerf" type="number" min="0" step="0.01" value="0.15"><i>mm</i></div></div>
+      <label class="chk" style="align-self:end;padding-bottom:6px"><input type="checkbox" id="kerfComp" checked>Compensate kerf</label>
+    </div>
+    <p class="hint cnc-only">Parts are drawn at finished size. Set your CAM to cut outside the outline and inside holes.</p>
+  </section>
+
+  <section class="grp">
+    <h2>Sheet layout</h2>
+    <div class="row">
+      <div class="f"><span>Sheet width</span><div class="in"><input id="sheetW" type="number" min="50" step="1" value="1220"><i>mm</i></div></div>
+      <div class="f"><span>Sheet height</span><div class="in"><input id="sheetH" type="number" min="50" step="1" value="610"><i>mm</i></div></div>
+      <div class="f"><span>Edge margin</span><div class="in"><input id="margin" type="number" min="0" step="1" value="10"><i>mm</i></div></div>
+      <div class="f"><span>Part spacing</span><div class="in"><input id="gap" type="number" min="0" step="0.5" value="8"><i>mm</i></div></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="labels" checked>Engrave part and slot labels</label>
+    <div class="row">
+      <div class="f"><span>Label height</span><div class="in"><input id="labelH" type="number" min="1" step="0.5" value="4"><i>mm</i></div></div>
+      <label class="chk" style="align-self:end;padding-bottom:6px"><input type="checkbox" id="sheetLine">Sheet outline</label>
+    </div>
+    <p class="hint">Labels are single-stroke paths, ready for a V-bit or a laser line pass.</p>
+  </section>
+
+  <section class="grp">
+    <h2>Export</h2>
+    <div class="btns"><button class="btn primary" id="dlZip" type="button">Download ZIP (DXF + SVG)</button><button class="btn" id="dlSvg" type="button">Sheet 1 SVG</button></div>
+    <p class="hint">DXF layers: CUT_OUTER, CUT_INNER, LABELS. Units are millimetres.</p>
+  </section>
+</aside>
+
+<main class="stage">
+  <div class="bar">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-v="v3d" id="t3d">Assembly</button>
+      <button role="tab" aria-selected="false" data-v="vsheets" id="tsheets">Sheets</button>
+      <button role="tab" aria-selected="false" data-v="vparts" id="tparts">Parts</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sParts">–</b><span>parts</span></div>
+      <div class="stat"><b id="sJoints">–</b><span>joints</span></div>
+      <div class="stat"><b id="sSheets">–</b><span>sheets</span></div>
+      <div class="stat"><b id="sCut">–</b><span>cut length</span></div>
+    </div>
+  </div>
+  <div class="views">
+    <div class="view" id="v3d">
+      <canvas id="cv"></canvas>
+      <div class="busy" id="busy" hidden>Slicing…</div>
+      <div class="ovl">
+        <div class="legend" id="legend"></div>
+        <label class="chk"><input type="checkbox" id="ghost" checked>Model</label>
+        <label class="chk join-only">Lift <input type="range" id="lift" min="0" max="100" value="0"></label>
+        <span class="join-only hint" id="moveInfo">Drag a panel to move it</span>
+        <button class="btn" id="snapMin" type="button" hidden>To floor</button>
+        <button class="btn" id="snapMax" type="button" hidden>To top</button>
+        <button class="btn join-only" id="resetMoves" type="button" hidden>Reset positions</button>
+      </div>
+    </div>
+    <div class="view" id="vsheets" hidden></div>
+    <div class="view" id="vparts" hidden></div>
+  </div>
+  <div class="warns" id="warns"></div>
+</main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/clipper-lib@6.4.2/clipper.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// CORE START
+var SC = 1000; // clipper integer units per mm
+var CL = (typeof ClipperLib !== 'undefined') ? ClipperLib : null;
+
+// ---------- vector helpers ----------
+function unit(k){ var a = [0,0,0]; a[k] = 1; return a; }
+function dot(a, b){ return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
+function cross(a, b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function scl(a, s){ return [a[0]*s, a[1]*s, a[2]*s]; }
+function add(a, b){ return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; }
+function axisFrame(n, uA, vA, pos){ return { O: scl(unit(n), pos), eu: unit(uA), ev: unit(vA), en: unit(n) }; }
+function shiftF(F, off){ return { O: add(F.O, scl(F.en, off)), eu: F.eu, ev: F.ev, en: F.en }; }
+
+// ---------- single-stroke font (cap height 6 units, glyph width 4) ----------
+var FONT_SRC = {
+  A:'0,0 2,6 4,0|0.7,2 3.3,2', B:'0,3 3,3 4,2 4,1 3,0 0,0 0,6 3,6 4,5 4,4 3,3', C:'4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1',
+  D:'0,0 0,6 2.5,6 4,4.5 4,1.5 2.5,0 0,0', E:'4,6 0,6 0,0 4,0|0,3 3,3', F:'4,6 0,6 0,0|0,3 3,3',
+  G:'4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1 4,3 2,3', H:'0,0 0,6|4,0 4,6|0,3 4,3', I:'2,0 2,6|1,6 3,6|1,0 3,0',
+  J:'4,6 4,1 3,0 1,0 0,1', K:'0,0 0,6|4,6 0,2|1.4,3.4 4,0', L:'0,6 0,0 4,0', M:'0,0 0,6 2,3 4,6 4,0',
+  N:'0,0 0,6 4,0 4,6', O:'1,0 0,1 0,5 1,6 3,6 4,5 4,1 3,0 1,0', P:'0,0 0,6 3,6 4,5 4,4 3,3 0,3',
+  Q:'1,0 0,1 0,5 1,6 3,6 4,5 4,1 3,0 1,0|2.5,1.5 4,0', R:'0,0 0,6 3,6 4,5 4,4 3,3 0,3|2,3 4,0',
+  S:'4,5 3,6 1,6 0,5 0,4 1,3 3,3 4,2 4,1 3,0 1,0 0,1', T:'0,6 4,6|2,6 2,0', U:'0,6 0,1 1,0 3,0 4,1 4,6',
+  V:'0,6 2,0 4,6', W:'0,6 1,0 2,4 3,0 4,6', X:'0,0 4,6|0,6 4,0', Y:'0,6 2,3 4,6|2,3 2,0', Z:'0,6 4,6 0,0 4,0',
+  '0':'1,0 0,1 0,5 1,6 3,6 4,5 4,1 3,0 1,0|0.6,1.2 3.4,4.8', '1':'1,5 2,6 2,0|1,0 3,0', '2':'0,5 1,6 3,6 4,5 4,4 0,0 4,0',
+  '3':'0,5 1,6 3,6 4,5 4,4 3,3 4,2 4,1 3,0 1,0 0,1|1.5,3 3,3', '4':'3,0 3,6 0,2 4,2',
+  '5':'4,6 0,6 0,3.5 3,3.5 4,2.5 4,1 3,0 1,0 0,1', '6':'4,5 3,6 1,6 0,5 0,1 1,0 3,0 4,1 4,2.5 3,3.5 0,3.5',
+  '7':'0,6 4,6 1.5,0', '8':'1,3 0,4 0,5 1,6 3,6 4,5 4,4 3,3 1,3 0,2 0,1 1,0 3,0 4,1 4,2 3,3',
+  '9':'0,1 1,0 3,0 4,1 4,5 3,6 1,6 0,5 0,3.5 1,2.5 4,2.5', '-':'0.5,3 3.5,3'
+};
+var FONT = {};
+Object.keys(FONT_SRC).forEach(function(k){ FONT[k] = FONT_SRC[k].split('|').map(function(s){ return s.split(' ').map(function(p){ return p.split(',').map(Number); }); }); });
+function charScale(ch){ return ch !== ch.toUpperCase() ? 0.72 : 1; }
+function textWidth(text, size){
+  var sc = size/6, w = 0, last = 1;
+  for (var i=0;i<text.length;i++){ last = charScale(text[i]); w += 6*sc*last; }
+  return text.length ? w - 2*sc*last : 0;
+}
+// Centred single-stroke text as open polylines, rotated by angle (degrees, CCW), in y-up coordinates.
+function textStrokes(text, cx, cy, size, angle){
+  var sc = size/6, x = -textWidth(text, size)/2, out = [];
+  var a = (angle || 0)*Math.PI/180, ca = Math.cos(a), sa = Math.sin(a);
+  for (var i=0;i<text.length;i++){
+    var ch = text[i], cs = sc*charScale(ch), g = FONT[ch.toUpperCase()];
+    if (g) g.forEach(function(st){ out.push(st.map(function(p){ var px = x + p[0]*cs, py = -size/2 + p[1]*cs; return [cx + px*ca - py*sa, cy + px*sa + py*ca]; })); });
+    x += 6*cs;
+  }
+  return out;
+}
+
+// ---------- file parsing ----------
+function parseSTL(buf){
+  var dv = new DataView(buf);
+  if (buf.byteLength >= 84){
+    var n = dv.getUint32(80, true);
+    if (84 + n*50 === buf.byteLength){
+      var out = new Float32Array(n*9);
+      for (var i=0;i<n;i++){ var o = 84 + i*50 + 12; for (var k=0;k<9;k++) out[i*9+k] = dv.getFloat32(o+k*4, true); }
+      return { pos: out };
+    }
+  }
+  var txt = new TextDecoder().decode(new Uint8Array(buf));
+  var re = /vertex\s+(\S+)\s+(\S+)\s+(\S+)/g, a = [], m;
+  while ((m = re.exec(txt))) a.push(+m[1], +m[2], +m[3]);
+  if (a.length < 9) throw new Error('No triangles found in this STL file.');
+  return { pos: new Float32Array(a.slice(0, a.length - a.length % 9)) };
+}
+function parseOBJ(text){
+  var v = [], out = [], names = [], cur = null;
+  text.split(/\r?\n/).forEach(function(line){
+    var s = line.trim();
+    if (s.indexOf('v ') === 0){ var p = s.split(/\s+/); v.push([+p[1], +p[2], +p[3]]); }
+    else if (s.indexOf('o ') === 0 || s.indexOf('g ') === 0){ cur = s.slice(2).trim() || cur; }
+    else if (s.indexOf('f ') === 0){
+      var idx = s.split(/\s+/).slice(1).map(function(t){ var i = parseInt(t.split('/')[0], 10); return i < 0 ? v.length + i : i - 1; });
+      for (var k=1;k+1<idx.length;k++){ [idx[0], idx[k], idx[k+1]].forEach(function(j){ var p = v[j]; if (!p) throw new Error('OBJ face refers to a missing vertex.'); out.push(p[0], p[1], p[2]); }); names.push(cur); }
+    }
+  });
+  if (out.length < 9) throw new Error('No faces found in this OBJ file.');
+  return { pos: new Float32Array(out), triNames: names.some(Boolean) ? names : null };
+}
+async function parse3MF(buf){
+  var zip = await JSZip.loadAsync(buf);
+  var files = Object.keys(zip.files).filter(function(n){ return /\.model$/i.test(n); });
+  if (!files.length) throw new Error('No 3D model found inside this 3MF file.');
+  var docs = {};
+  for (var i=0;i<files.length;i++) docs['/' + files[i].replace(/^\//, '')] = new DOMParser().parseFromString(await zip.file(files[i]).async('string'), 'application/xml');
+  var main = files.filter(function(n){ return /^\/?3D\/3dmodel\.model$/i.test(n); })[0] || files[0];
+  var mainPath = '/' + main.replace(/^\//, ''), mainDoc = docs[mainPath];
+  var units = { micron: 0.001, millimeter: 1, centimeter: 10, inch: 25.4, foot: 304.8, meter: 1000 };
+  var unitScale = units[mainDoc.documentElement.getAttribute('unit') || 'millimeter'] || 1;
+  function attr(el, local){ for (var i=0;i<el.attributes.length;i++) if (el.attributes[i].localName === local) return el.attributes[i].value; return null; }
+  function mat(str){ if (!str) return null; var m = str.trim().split(/\s+/).map(Number); return m.length === 12 ? m : null; }
+  function mul(a, b){ // row-vector convention: p * a * b
+    if (!a) return b; if (!b) return a;
+    var r = new Array(12);
+    for (var i=0;i<4;i++) for (var j=0;j<3;j++){ var s = i === 3 ? b[9+j] : 0; for (var k=0;k<3;k++) s += a[i*3+k]*b[k*3+j]; r[i*3+j] = s; }
+    return r;
+  }
+  function findObj(path, id){ var d = docs[path]; if (!d) return null; var objs = d.getElementsByTagNameNS('*', 'object'); for (var i=0;i<objs.length;i++) if (objs[i].getAttribute('id') === id) return objs[i]; return null; }
+  var pos = [], names = [];
+  function emit(path, id, M, name, depth){
+    if (depth > 16) return;
+    var ob = findObj(path, id); if (!ob) return;
+    var nm = name || ob.getAttribute('name') || ('Object ' + id);
+    var mesh = ob.getElementsByTagNameNS('*', 'mesh')[0];
+    if (mesh){
+      var vs = mesh.getElementsByTagNameNS('*', 'vertex'), V = new Float64Array(vs.length*3);
+      for (var i=0;i<vs.length;i++){
+        var x = +vs[i].getAttribute('x'), y = +vs[i].getAttribute('y'), z = +vs[i].getAttribute('z');
+        if (M){ V[i*3] = x*M[0]+y*M[3]+z*M[6]+M[9]; V[i*3+1] = x*M[1]+y*M[4]+z*M[7]+M[10]; V[i*3+2] = x*M[2]+y*M[5]+z*M[8]+M[11]; }
+        else { V[i*3] = x; V[i*3+1] = y; V[i*3+2] = z; }
+      }
+      var ts = mesh.getElementsByTagNameNS('*', 'triangle');
+      for (var t=0;t<ts.length;t++){
+        ['v1','v2','v3'].forEach(function(k){ var j = +ts[t].getAttribute(k); pos.push(V[j*3]*unitScale, V[j*3+1]*unitScale, V[j*3+2]*unitScale); });
+        names.push(nm);
+      }
+    }
+    var comps = ob.getElementsByTagNameNS('*', 'component');
+    for (var c=0;c<comps.length;c++){
+      var p = attr(comps[c], 'path');
+      emit(p ? '/' + p.replace(/^\//, '') : path, comps[c].getAttribute('objectid'), mul(mat(comps[c].getAttribute('transform')), M), nm, depth+1);
+    }
+  }
+  var items = mainDoc.getElementsByTagNameNS('*', 'item');
+  for (var k=0;k<items.length;k++){ var ip = attr(items[k], 'path'); emit(ip ? '/' + ip.replace(/^\//, '') : mainPath, items[k].getAttribute('objectid'), mat(items[k].getAttribute('transform')), null, 0); }
+  if (pos.length < 9) throw new Error('No triangles found in this 3MF file.');
+  return { pos: new Float32Array(pos), triNames: names };
+}
+function weld(pos){
+  var mn=[Infinity,Infinity,Infinity], mx=[-Infinity,-Infinity,-Infinity], i, k;
+  for (i=0;i<pos.length;i+=3) for (k=0;k<3;k++){ if (pos[i+k]<mn[k]) mn[k]=pos[i+k]; if (pos[i+k]>mx[k]) mx[k]=pos[i+k]; }
+  var diag = Math.hypot(mx[0]-mn[0], mx[1]-mn[1], mx[2]-mn[2]) || 1, tol = diag*1e-6;
+  var map = new Map(), verts = [], tris = new Uint32Array(pos.length/3);
+  for (i=0;i<pos.length/3;i++){
+    var x=pos[i*3], y=pos[i*3+1], z=pos[i*3+2];
+    var key = Math.round(x/tol)+'_'+Math.round(y/tol)+'_'+Math.round(z/tol);
+    var id = map.get(key);
+    if (id === undefined){ id = verts.length/3; map.set(key, id); verts.push(x,y,z); }
+    tris[i] = id;
+  }
+  return { verts: new Float64Array(verts), tris: tris };
+}
+// Split into bodies: triangles join only across edges shared by exactly two triangles,
+// so a lid touching its recess stays a separate body even where vertices coincide.
+function splitBodies(raw, triNames){
+  var T = raw.tris, nt = T.length/3, nv = raw.verts.length/3, i, e;
+  var par = new Int32Array(nt); for (i=0;i<nt;i++) par[i] = i;
+  function find(x){ while (par[x] !== x){ par[x] = par[par[x]]; x = par[x]; } return x; }
+  if (nt <= 2500000){
+    var cnt = new Map(), first = new Map();
+    for (i=0;i<nt;i++) for (e=0;e<3;e++){ var a = T[i*3+e], b = T[i*3+(e+1)%3]; if (a === b) continue; var key = a < b ? a*nv+b : b*nv+a; cnt.set(key, (cnt.get(key) || 0) + 1); }
+    for (i=0;i<nt;i++) for (e=0;e<3;e++){
+      var a2 = T[i*3+e], b2 = T[i*3+(e+1)%3]; if (a2 === b2) continue; var k2 = a2 < b2 ? a2*nv+b2 : b2*nv+a2;
+      if (cnt.get(k2) !== 2) continue;
+      var f = first.get(k2); if (f === undefined) first.set(k2, i); else { var ra = find(f), rb = find(i); if (ra !== rb) par[ra] = rb; }
+    }
+  }
+  var groups = new Map();
+  for (i=0;i<nt;i++){ var r = find(i); var g = groups.get(r); if (!g){ g = []; groups.set(r, g); } g.push(i); }
+  var list = Array.from(groups.values()).sort(function(a, b){ return b.length - a.length; });
+  var MAXB = 24;
+  if (list.length > MAXB){ var rest = []; list.slice(MAXB-1).forEach(function(g){ rest = rest.concat(g); }); list = list.slice(0, MAXB-1); list.push(rest); list.restMerged = true; }
+  var seen = {};
+  return list.map(function(g, idx){
+    var base = (list.restMerged && idx === list.length-1) ? 'Other small shells' : ((triNames && triNames[g[0]]) || ('Body ' + (idx+1)));
+    seen[base] = (seen[base] || 0) + 1;
+    return { name: seen[base] > 1 ? base + ' (' + seen[base] + ')' : base, tris: Int32Array.from(g) };
+  });
+}
+function matMul(a, b){ var r=[]; for (var i=0;i<3;i++) for (var j=0;j<3;j++){ var s=0; for (var k=0;k<3;k++) s+=a[i*3+k]*b[k*3+j]; r.push(s); } return r; }
+function rot90(axis){ return axis==='x' ? [1,0,0, 0,0,-1, 0,1,0] : axis==='y' ? [0,0,1, 0,1,0, -1,0,0] : [0,-1,0, 1,0,0, 0,0,1]; }
+// Rotate, scale and centre the model; returns per-body compact meshes with their roles.
+function transformModel(raw, R, roles, fitAxis, fitVal){
+  var V = raw.verts, n = V.length/3, rv = new Float64Array(V.length), i, k;
+  for (i=0;i<n;i++){ var x=V[i*3], y=V[i*3+1], z=V[i*3+2]; for (k=0;k<3;k++) rv[i*3+k] = R[k*3]*x + R[k*3+1]*y + R[k*3+2]*z; }
+  var mn=[Infinity,Infinity,Infinity], mx=[-Infinity,-Infinity,-Infinity];
+  raw.bodies.forEach(function(b, bi){
+    if (roles[bi] === 'ignore') return;
+    for (var t=0;t<b.tris.length;t++) for (var c=0;c<3;c++){ var vi = raw.tris[b.tris[t]*3+c]; for (var q=0;q<3;q++){ var val = rv[vi*3+q]; if (val<mn[q]) mn[q]=val; if (val>mx[q]) mx[q]=val; } }
+  });
+  if (!isFinite(mn[0])){ mn=[0,0,0]; mx=[1,1,1]; }
+  var s = fitAxis === 'file' ? 1 : fitVal / Math.max(1e-9, mx[+fitAxis]-mn[+fitAxis]);
+  var off = [(mn[0]+mx[0])/2, (mn[1]+mx[1])/2, mn[2]];
+  var bodies = raw.bodies.map(function(b, bi){
+    var remap = new Map(), verts = [], tris = new Uint32Array(b.tris.length*3), bmn=[Infinity,Infinity,Infinity], bmx=[-Infinity,-Infinity,-Infinity];
+    for (var t=0;t<b.tris.length;t++) for (var c=0;c<3;c++){
+      var vi = raw.tris[b.tris[t]*3+c], id = remap.get(vi);
+      if (id === undefined){ id = verts.length/3; remap.set(vi, id); for (var q=0;q<3;q++){ var val = (rv[vi*3+q]-off[q])*s; verts.push(val); if (val<bmn[q]) bmn[q]=val; if (val>bmx[q]) bmx[q]=val; } }
+      tris[t*3+c] = id;
+    }
+    return { name: b.name, role: roles[bi] || 'slice', verts: new Float64Array(verts), tris: tris, min: bmn, max: bmx };
+  });
+  function bounds(filter){ var a=[Infinity,Infinity,Infinity], z=[-Infinity,-Infinity,-Infinity]; bodies.forEach(function(b){ if (!filter(b)) return; for (var q=0;q<3;q++){ a[q]=Math.min(a[q], b.min[q]); z[q]=Math.max(z[q], b.max[q]); } }); return [a, z]; }
+  var all = bounds(function(b){ return b.role !== 'ignore'; }), sl = bounds(function(b){ return b.role === 'slice'; });
+  if (!isFinite(sl[0][0])) sl = all;
+  return { bodies: bodies, min: all[0], max: all[1], sMin: sl[0], sMax: sl[1], scale: s };
+}
+
+// ---------- slicing ----------
+// Intersect a mesh with plane F; returns closed loops in the plane's (u, v) coordinates.
+function sliceLoops(mesh, F){
+  var V = mesh.verts, T = mesh.tris, nv = V.length/3, d = new Float64Array(nv), i;
+  var O = F.O, en = F.en, eu = F.eu, ev = F.ev;
+  for (i=0;i<nv;i++) d[i] = (V[i*3]-O[0])*en[0] + (V[i*3+1]-O[1])*en[1] + (V[i*3+2]-O[2])*en[2];
+  var pts = new Map(), adj = new Map();
+  function pt(a, b){
+    var k = a<b ? a*nv+b : b*nv+a;
+    if (!pts.has(k)){
+      var t = d[a]/(d[a]-d[b]);
+      var px = V[a*3]+(V[b*3]-V[a*3])*t - O[0], py = V[a*3+1]+(V[b*3+1]-V[a*3+1])*t - O[1], pz = V[a*3+2]+(V[b*3+2]-V[a*3+2])*t - O[2];
+      pts.set(k, [px*eu[0]+py*eu[1]+pz*eu[2], px*ev[0]+py*ev[1]+pz*ev[2]]);
+    }
+    return k;
+  }
+  function link(a, b){ (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a); }
+  for (var t=0;t<T.length;t+=3){
+    var I = [T[t], T[t+1], T[t+2]], S = [d[I[0]]>=0, d[I[1]]>=0, d[I[2]]>=0];
+    if (S[0]===S[1] && S[1]===S[2]) continue;
+    var ks = [];
+    for (var e=0;e<3;e++){ var f=(e+1)%3; if (S[e]!==S[f] && I[e]!==I[f]) ks.push(pt(I[e], I[f])); }
+    if (ks.length===2 && ks[0]!==ks[1]) link(ks[0], ks[1]);
+  }
+  var seen = new Set(), loops = [], open = 0;
+  adj.forEach(function(_, start){
+    if (seen.has(start)) return;
+    var loop = [], prev = -1, cur = start, closed = false;
+    for (;;){
+      seen.add(cur); loop.push(pts.get(cur));
+      var nb = adj.get(cur), next = -1;
+      for (var j=0;j<nb.length;j++) if (nb[j]!==prev && !seen.has(nb[j])){ next = nb[j]; break; }
+      if (next === -1){ closed = nb.indexOf(start) >= 0 && loop.length > 2; break; }
+      prev = cur; cur = next;
+    }
+    if (!closed) open++;
+    if (loop.length >= 3) loops.push(loop);
+  });
+  return { loops: loops, open: open };
+}
+function toPath(l){ return l.map(function(p){ return { X: Math.round(p[0]*SC), Y: Math.round(p[1]*SC) }; }); }
+function fromPath(p){ return p.map(function(q){ return [q.X/SC, q.Y/SC]; }); }
+function clipOp(subj, clip, type){
+  var c = new CL.Clipper(), sol = [];
+  c.AddPaths(subj, CL.PolyType.ptSubject, true);
+  if (clip && clip.length) c.AddPaths(clip, CL.PolyType.ptClip, true);
+  c.Execute(type, sol, CL.PolyFillType.pftNonZero, CL.PolyFillType.pftNonZero);
+  return sol;
+}
+function offsetPaths(paths, dist){ var co = new CL.ClipperOffset(2, 0.01*SC), sol = []; co.AddPaths(paths, CL.JoinType.jtRound, CL.EndType.etClosedPolygon); co.Execute(sol, dist*SC); return sol; }
+function regionFromLoops(loops, tol){
+  var paths = CL.Clipper.CleanPolygons(loops.map(toPath), tol*SC);
+  var c = new CL.Clipper(), sol = [];
+  c.AddPaths(paths, CL.PolyType.ptSubject, true);
+  c.Execute(CL.ClipType.ctUnion, sol, CL.PolyFillType.pftEvenOdd, CL.PolyFillType.pftEvenOdd);
+  return sol;
+}
+// Material intervals along the vertical line X = u (even-odd over region paths), in mm.
+function intervals(paths, u){
+  var U = u*SC, vs = [];
+  for (var a=0;a<paths.length;a++){
+    var P = paths[a];
+    for (var j=0;j<P.length;j++){
+      var p = P[j], q = P[(j+1)%P.length];
+      if ((p.X<=U) !== (q.X<=U)){ var t = (U-p.X)/(q.X-p.X); vs.push((p.Y+(q.Y-p.Y)*t)/SC); }
+    }
+  }
+  vs.sort(function(a,b){ return a-b; });
+  var out = []; for (var i=0;i+1<vs.length;i+=2) if (vs[i+1]-vs[i] > 1e-6) out.push([vs[i], vs[i+1]]);
+  return out;
+}
+function rectPath(u0, u1, v0, v1){ return toPath([[u0,v0],[u1,v0],[u1,v1],[u0,v1]]); }
+function pip(pt, rings){
+  var x = pt[0], y = pt[1], inside = false;
+  rings.forEach(function(r){ for (var i=0,j=r.length-1;i<r.length;j=i++){ var a=r[i], b=r[j]; if ((a[1]>y)!==(b[1]>y) && x < (b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0]) inside = !inside; } });
+  return inside;
+}
+function ringsBox(r){ var b=[Infinity,Infinity,-Infinity,-Infinity]; r.forEach(function(p){ if(p[0]<b[0])b[0]=p[0]; if(p[1]<b[1])b[1]=p[1]; if(p[0]>b[2])b[2]=p[0]; if(p[1]>b[3])b[3]=p[1]; }); return b; }
+function perim(r){ var s=0; for (var i=0;i<r.length;i++){ var a=r[i], b=r[(i+1)%r.length]; s+=Math.hypot(b[0]-a[0], b[1]-a[1]); } return s; }
+function areaOf(r){ var s=0; for (var i=0;i<r.length;i++){ var a=r[i], b=r[(i+1)%r.length]; s+=a[0]*b[1]-b[0]*a[1]; } return s/2; }
+function labelCandidates(outer, holes){
+  var rings = [outer].concat(holes), b = ringsBox(outer), out = [];
+  for (var k=1;k<=19;k++){
+    var y = b[1] + (b[3]-b[1])*k/20, xs = [];
+    rings.forEach(function(r){ for (var i=0;i<r.length;i++){ var p=r[i], q=r[(i+1)%r.length]; if ((p[1]>y)!==(q[1]>y)) xs.push(p[0]+(q[0]-p[0])*(y-p[1])/(q[1]-p[1])); } });
+    xs.sort(function(a,c){ return a-c; });
+    for (var i=0;i+1<xs.length;i+=2){
+      var len = xs[i+1]-xs[i], cx = (xs[i]+xs[i+1])/2, ys = [];
+      rings.forEach(function(r){ for (var j=0;j<r.length;j++){ var p=r[j], q=r[(j+1)%r.length]; if ((p[0]>cx)!==(q[0]>cx)) ys.push(p[1]+(q[1]-p[1])*(cx-p[0])/(q[0]-p[0])); } });
+      var up = Infinity, dn = Infinity; ys.forEach(function(v){ if (v >= y) up = Math.min(up, v-y); else dn = Math.min(dn, y-v); });
+      out.push({ s: Math.min(len/2, up, dn), p: [cx, y], len: len });
+    }
+  }
+  return out.sort(function(a, c){ return c.s - a.s; });
+}
+function axisPositions(min, max, count){ var out=[]; for (var i=0;i<count;i++) out.push(min + (max-min)*(i+1)/(count+1)); return out; }
+// The line where two panels cross, expressed in one panel's (u, v) coordinates.
+// rot holds that panel's region rotated so the line is the vertical axis: X = across, Y = along.
+function lineIn(P, X, D){
+  var rel = [X[0]-P.F.O[0], X[1]-P.F.O[1], X[2]-P.F.O[2]];
+  var p = [dot(rel, P.F.eu), dot(rel, P.F.ev)], d = [dot(D, P.F.eu), dot(D, P.F.ev)], L = Math.hypot(d[0], d[1]);
+  d = [d[0]/L, d[1]/L]; var nrm = [d[1], -d[0]];
+  return {
+    d: d, nrm: nrm,
+    toUV: function(n, s){ return [p[0] + s*d[0] + n*nrm[0], p[1] + s*d[1] + n*nrm[1]]; },
+    rot: P.region.map(function(path){ return path.map(function(q){ var x = q.X/SC - p[0], y = q.Y/SC - p[1]; return { X: Math.round((x*nrm[0] + y*nrm[1])*SC), Y: Math.round((x*d[0] + y*d[1])*SC) }; }); })
+  };
+}
+
+function buildParts(model, o){
+  var warnings = [], panels = [], joints = 0, openLoops = 0, skipped = 0, crossings = [], tol = 0.02, hubR = null;
+  var sliceB = model.bodies.filter(function(b){ return b.role === 'slice'; });
+  var koB = model.bodies.filter(function(b){ return b.role === 'keep' || b.role === 'keepcut'; });
+  if (!sliceB.length) return { parts: [], joints: 0, warnings: ['No body is set to Slice.'], panels: [] };
+  var mn = model.sMin, mx = model.sMax, t = o.thick, w = o.thick + o.clear;
+  function section(F){
+    var all = [];
+    sliceB.forEach(function(b){ var s = sliceLoops(b, F); openLoops += s.open; if (s.loops.length) all = all.concat(regionFromLoops(s.loops, tol)); });
+    return sliceB.length > 1 && all.length ? clipOp(all, null, CL.ClipType.ctUnion) : all;
+  }
+  // Everything a keep-out body occupies anywhere across this board's thickness, grown by the clearance.
+  function keepout(F){
+    if (!koB.length) return null;
+    var all = [];
+    [-t/2 + 0.05, 0, t/2 - 0.05].forEach(function(off){ var G = shiftF(F, off); koB.forEach(function(b){ var s = sliceLoops(b, G); if (s.loops.length) all = all.concat(regionFromLoops(s.loops, tol)); }); });
+    return all.length ? offsetPaths(clipOp(all, null, CL.ClipType.ctUnion), o.keepClear) : null;
+  }
+  function makePanel(fam, idx, F, label, clipRect){
+    var region = section(F);
+    if (clipRect && region.length) region = clipOp(region, [clipRect], CL.ClipType.ctIntersection);
+    var ko = region.length ? keepout(F) : null;
+    if (ko && ko.length) region = clipOp(region, ko, CL.ClipType.ctDifference);
+    var P = { fam: fam, name: fam + (idx+1), F: F, planeLabel: label, region: region, cuts: [], labels: [], slots: [] };
+    panels.push(P); return P;
+  }
+  var cnc = o.machine === 'cnc', r = o.bit/2 + 0.02;
+  var reliefOn = cnc && o.method !== 'stack' && o.relief !== 'none';
+  var reliefDepth = !reliefOn ? 0 : (o.relief === 'tdepth' ? r : o.relief === 'dogbone' ? r*0.3 : 0);
+  var tops = [], bots = [], refDir = null;
+  if (o.method === 'interlock'){
+    var na = o.pair[0], nb = o.pair[1], c = 3 - na - nb;
+    var mv = function(k){ return (o.moves && o.moves[k]) || 0; };
+    var A = axisPositions(mn[na], mx[na], o.countA).map(function(p,i){ p += mv('A'+(i+1)); return makePanel('A', i, axisFrame(na, nb, c, p), 'XYZ'[na] + ' = ' + p.toFixed(1)); });
+    var B = axisPositions(mn[nb], mx[nb], o.countB).map(function(p,i){ p += mv('B'+(i+1)); return makePanel('B', i, axisFrame(nb, na, c, p), 'XYZ'[nb] + ' = ' + p.toFixed(1)); });
+    tops = o.flip ? B : A; bots = o.flip ? A : B;
+    refDir = function(){ return unit(c); };
+  } else if (o.method === 'radial'){
+    var N = o.fins;
+    var hubMin = N >= 3 ? (w/2 + 0.5)/Math.tan(Math.PI/N) : w;
+    hubR = Math.max(o.hub, hubMin);
+    if (o.hub > 0 && o.hub < hubMin) warnings.push('Hub radius raised to ' + hubMin.toFixed(1) + ' mm so neighbouring fins do not collide.');
+    var mvr = function(k){ return (o.moves && o.moves[k]) || 0; };
+    var H = axisPositions(mn[2], mx[2], o.rings).map(function(z,i){ z += mvr('H'+(i+1)); return makePanel('H', i, axisFrame(2, 0, 1, z), 'Z = ' + z.toFixed(1)); });
+    var Rf = [];
+    for (var i=0;i<N;i++){
+      var th = 2*Math.PI*i/N + mvr('R'+(i+1))*Math.PI/180, cs = Math.cos(th), sn = Math.sin(th);
+      Rf.push(makePanel('R', i, { O: [0,0,0], eu: [cs, sn, 0], ev: [0,0,1], en: [sn, -cs, 0] }, 'θ = ' + (th*180/Math.PI).toFixed(1) + '°', rectPath(hubR, 1e5, -1e5, 1e5)));
+    }
+    tops = H; bots = Rf;
+    refDir = function(P){ return P.F.eu; };
+  } else {
+    var n = o.stackAxis, count = Math.max(1, Math.floor((mx[n]-mn[n])/t + 1e-6));
+    if (count > 400){ warnings.push('That would be ' + count + ' layers. Showing the first 400; use thicker stock or a smaller model.'); count = 400; }
+    for (var li=0;li<count;li++){ var lp = mn[n] + t*(li+0.5); makePanel('L', li, axisFrame(n, (n+1)%3, (n+2)%3, lp), 'XYZ'[n] + ' = ' + lp.toFixed(1)); }
+  }
+  bots.forEach(function(P){ P.liftDir = refDir(P); });
+  // Parallel panels of one family closer than the stock thickness occupy the same material.
+  ['A','B','H'].forEach(function(f){
+    var fam = panels.filter(function(P){ return P.fam === f; }).map(function(P){ return { P: P, pos: dot(P.F.O, P.F.en) }; }).sort(function(a, b){ return a.pos - b.pos; });
+    for (var i=1;i<fam.length;i++){ var gap = fam[i].pos - fam[i-1].pos; if (gap < t - 0.01) warnings.push(fam[i-1].P.name + ' and ' + fam[i].P.name + ' overlap (' + gap.toFixed(1) + ' mm apart with ' + t + ' mm stock), so the joints around them fail. Move one of them.'); }
+  });
+  // Keep-out bodies marked to cut become their own flat parts, sliced through their thinnest direction.
+  var kCount = 0;
+  model.bodies.forEach(function(b){
+    if (b.role !== 'keepcut') return;
+    var ext = [0,1,2].map(function(k){ return b.max[k]-b.min[k]; }), k = ext.indexOf(Math.min.apply(null, ext)), pos = (b.min[k]+b.max[k])/2;
+    var F = axisFrame(k, (k+1)%3, (k+2)%3, pos), s = sliceLoops(b, F);
+    var P = { fam: 'K', name: 'K' + (++kCount), F: F, planeLabel: b.name, region: s.loops.length ? regionFromLoops(s.loops, tol) : [], cuts: [], labels: [], slots: [], noJoin: true };
+    if (Math.abs(ext[k] - t) > 0.3) warnings.push(P.name + ' (' + b.name + ') is ' + ext[k].toFixed(1) + ' mm thick in the model but will be cut from ' + t + ' mm stock.');
+    panels.push(P);
+  });
+  if (o.method !== 'stack' && cnc && o.bit > w + 1e-9) warnings.push('Bit (' + o.bit + ' mm) is wider than the slot (' + w.toFixed(2) + ' mm). Use a smaller bit or thicker stock.');
+  if (openLoops) warnings.push('The mesh has gaps (' + openLoops + ' open slice contours were closed with straight lines). Repair the model if parts look wrong.');
+
+  // Where each top panel crosses each bottom panel.
+  var pairs = [];
+  tops.forEach(function(T){ bots.forEach(function(Bt){
+    if (!T.region.length || !Bt.region.length) return;
+    var Dc = cross(T.F.en, Bt.F.en), L2 = dot(Dc, Dc); if (L2 < 1e-9) return;
+    var h1 = dot(T.F.en, T.F.O), h2 = dot(Bt.F.en, Bt.F.O);
+    var X = scl(add(scl(cross(Bt.F.en, Dc), h1), scl(cross(Dc, T.F.en), h2)), 1/L2);
+    var D = scl(Dc, 1/Math.sqrt(L2)); if (dot(D, refDir(Bt)) < 0) D = scl(D, -1);
+    var LT = lineIn(T, X, D), LB = lineIn(Bt, X, D);
+    var IT = intervals(LT.rot, 0), IB = intervals(LB.rot, 0);
+    if (IT.length && IB.length) pairs.push({ T: T, Bt: Bt, LT: LT, LB: LB, IT: IT, IB: IB });
+  }); });
+  function edgeAt(rot, mid, end){
+    var best = end ? -Infinity : Infinity;
+    [-w/2 + 0.01, 0, w/2 - 0.01].forEach(function(n){
+      var I = intervals(rot, n).filter(function(x){ return x[0] <= mid && x[1] >= mid; })[0];
+      if (I) best = end ? Math.max(best, I[1]) : Math.min(best, I[0]);
+    });
+    return best;
+  }
+  // A slot is fine if each side either has solid material beyond it, or has none at all (the slot breaks out
+  // of an edge as a clean rebate, e.g. a panel sitting on the floor). Thin slivers beside the slot are not.
+  function spans(rot, mid){
+    var has = function(n){ return intervals(rot, n).some(function(x){ return x[0] <= mid && x[1] >= mid; }); };
+    var sides = [-1, 1].map(function(sg){ var near = has(sg*(w/2 + 0.2)), far = has(sg*(w/2 + 1.5)); return { ok: far || !near, solid: far }; });
+    return sides[0].ok && sides[1].ok && (sides[0].solid || sides[1].solid);
+  }
+  function slotRect(L, s0, s1){ return toPath([L.toUV(-w/2, s0), L.toUV(w/2, s0), L.toUV(w/2, s1), L.toUV(-w/2, s1)]); }
+  function circleAt(L, n, s){
+    var seg = 32, R = r/Math.cos(Math.PI/seg), l = [];
+    for (var i=0;i<seg;i++){ var a = 2*Math.PI*i/seg; l.push(L.toUV(n + R*Math.cos(a), s + R*Math.sin(a))); }
+    return toPath(l);
+  }
+  function relief(P, L, s, dir){
+    if (!reliefOn) return;
+    [[-w/2, 1], [w/2, -1]].forEach(function(cn){
+      var cx, cy;
+      if (o.relief === 'dogbone'){ cx = cn[0] + cn[1]*r*Math.SQRT1_2; cy = s + dir*r*Math.SQRT1_2; }
+      else if (o.relief === 'tdepth'){ cx = cn[0] + cn[1]*r; cy = s; }
+      else { cx = cn[0]; cy = s + dir*r; }
+      P.cuts.push(circleAt(L, cx, cy));
+    });
+  }
+  function slotLabel(P, L, s, text){
+    var size = o.labelH, ang = Math.atan2(L.nrm[1], L.nrm[0])*180/Math.PI;
+    if (ang > 90.01) ang -= 180; if (ang <= -89.99) ang += 180;
+    var hw = textWidth(text, size)/2 + 0.6, hh = size/2 + 0.6;
+    P.labels.push({ u: L.toUV(0, s)[0], v: L.toUV(0, s)[1], text: text, size: size, angle: ang,
+      check: [L.toUV(-hw, s-hh), L.toUV(hw, s-hh), L.toUV(hw, s+hh), L.toUV(-hw, s+hh), L.toUV(0, s)] });
+  }
+  var disabled = new Map(), flipped = new Set();
+  function cutJoints(){
+    panels.forEach(function(P){ P.cuts = []; P.labels = []; P.slots = []; });
+    joints = 0; skipped = 0; crossings = [];
+    pairs.forEach(function(pr){
+      var T = pr.T, Bt = pr.Bt, LT = pr.LT, LB = pr.LB;
+      pr.IT.forEach(function(it){ pr.IB.forEach(function(ib){
+        var lo = Math.max(it[0], ib[0]), hi = Math.min(it[1], ib[1]);
+        if (hi - lo < 0.05) return;
+        var mid = (lo + hi)/2, key = T.name + '|' + Bt.name + '|' + Math.round(mid);
+        var tEnd = edgeAt(LT.rot, mid, true); if (!isFinite(tEnd)) tEnd = it[1];
+        var bStart = edgeAt(LB.rot, mid, false); if (!isFinite(bStart)) bStart = ib[0];
+        var trim = disabled.get(key);
+        if (!trim){
+          if (hi - lo < t) trim = (it[1]-it[0]) < (ib[1]-ib[0]) ? 'top' : 'bot';
+          else if (!spans(LT.rot, mid)) trim = 'top';
+          else if (!spans(LB.rot, mid)) trim = 'bot';
+        }
+        if (trim){
+          // No interlock here: notch one panel through the whole overlap so the two don't collide.
+          skipped++; crossings.push({ key: key, trim: trim, T: T, Bt: Bt, LT: LT, LB: LB, lo: lo, hi: hi });
+          if (trim === 'top'){ T.cuts.push(slotRect(LT, lo, tEnd + 1)); relief(T, LT, lo, 1); }
+          else { Bt.cuts.push(slotRect(LB, bStart - 1, hi)); relief(Bt, LB, hi, -1); }
+          return;
+        }
+        joints++;
+        T.cuts.push(slotRect(LT, mid, tEnd + 1)); Bt.cuts.push(slotRect(LB, bStart - 1, mid));
+        relief(T, LT, mid, 1); relief(Bt, LB, mid, -1);
+        var probe = reliefDepth + 0.4 + (o.machine === 'laser' ? o.kerf : 0);
+        var pT = LT.toUV(0, mid - probe), pB = LB.toUV(0, mid + probe);
+        T.slots.push([pT[0], pT[1], key, 'top']); Bt.slots.push([pB[0], pB[1], key, 'bot']);
+        if (o.labels){ slotLabel(T, LT, mid - reliefDepth - o.labelH*1.1, Bt.name); slotLabel(Bt, LB, mid + reliefDepth + o.labelH*1.1, T.name); }
+      }); });
+    });
+  }
+
+  var minArea = Math.max(4, o.minSize*o.minSize);
+  function extract(P){
+    if (!P.region.length) return { kept: [], gone: [] };
+    var c = new CL.Clipper(), tree = new CL.PolyTree();
+    c.AddPaths(P.region, CL.PolyType.ptSubject, true);
+    if (P.cuts.length) c.AddPaths(P.cuts, CL.PolyType.ptClip, true);
+    c.Execute(P.cuts.length ? CL.ClipType.ctDifference : CL.ClipType.ctUnion, tree, CL.PolyFillType.pftNonZero, CL.PolyFillType.pftNonZero);
+    var ex = CL.JS.PolyTreeToExPolygons(tree);
+    if (o.machine === 'laser' && o.kerfComp && o.kerf > 0){
+      var all = [];
+      ex.forEach(function(e){
+        var co = new CL.ClipperOffset(2, 0.01*SC), t2 = new CL.PolyTree();
+        co.AddPaths([e.outer].concat(e.holes), CL.JoinType.jtMiter, CL.EndType.etClosedPolygon);
+        co.Execute(t2, o.kerf/2*SC);
+        all = all.concat(CL.JS.PolyTreeToExPolygons(t2));
+      });
+      ex = all;
+    }
+    var kept = [], gone = [];
+    ex.forEach(function(e){
+      var outer = fromPath(CL.Clipper.CleanPolygon(e.outer, tol*SC));
+      if (outer.length < 3) return;
+      var holes = e.holes.map(function(h){ return fromPath(CL.Clipper.CleanPolygon(h, tol*SC)); }).filter(function(h){ return h.length >= 3 && Math.abs(areaOf(h)) > 0.5; });
+      var it = { outer: outer, holes: holes, bbox: ringsBox(outer), area: Math.abs(areaOf(outer)) - holes.reduce(function(s,h){ return s + Math.abs(areaOf(h)); }, 0) };
+      var rg = [outer].concat(holes);
+      it.joints = P.slots.filter(function(sp){ return pip(sp, rg); }).length;
+      if (it.area < minArea){ it.why = 'small'; gone.push(it); }
+      else if (o.method !== 'stack' && o.dropLoose && !P.noJoin && !it.joints){ it.why = 'loose'; gone.push(it); }
+      else kept.push(it);
+    });
+    return { kept: kept, gone: gone };
+  }
+
+  // Build, then cancel joints that lost their partner material and rebuild until nothing changes.
+  var results;
+  for (var pass=0; pass<8; pass++){
+    if (pairs.length) cutJoints();
+    results = panels.map(extract);
+    if (!pairs.length) break;
+    var changed = false;
+    var keptOf = new Map();
+    panels.forEach(function(P, pi){ keptOf.set(P, results[pi].kept.map(function(k){ return [k.outer].concat(k.holes); })); });
+    panels.forEach(function(P){
+      var rgs = keptOf.get(P);
+      P.slots.forEach(function(sp){ if (!disabled.has(sp[2]) && !rgs.some(function(rg){ return pip(sp, rg); })){ disabled.set(sp[2], sp[3]); changed = true; } });
+    });
+    var present = function(P, L, lo, hi){
+      var rgs = keptOf.get(P) || [];
+      for (var k=0;k<=6;k++){ var s = lo + (hi-lo)*k/6;
+        for (var du of [-(w/2 + 0.6), 0, w/2 + 0.6]){ var q = L.toUV(du, s); if (rgs.some(function(rg){ return pip(q, rg); })) return true; } }
+      return false;
+    };
+    crossings.forEach(function(x){
+      var other = x.trim === 'top' ? x.Bt : x.T, L = x.trim === 'top' ? x.LB : x.LT, otherSide = x.trim === 'top' ? 'bot' : 'top';
+      if (!flipped.has(x.key) && !present(other, L, x.lo, x.hi)){ flipped.add(x.key); disabled.set(x.key, otherSide); changed = true; }
+    });
+    if (!changed) break;
+  }
+
+  var parts = [], dropped = 0, loose = 0;
+  panels.forEach(function(P, pi){
+    var isl = results[pi].kept;
+    results[pi].gone.forEach(function(g){ if (g.why === 'small') dropped++; else loose++; });
+    isl.sort(function(a,b){ return a.bbox[0] - b.bbox[0]; });
+    isl.forEach(function(e, k){
+      var name = P.name + (isl.length > 1 ? String.fromCharCode(97+k) : '');
+      var rings = [e.outer].concat(e.holes), labels = [];
+      if (o.labels){
+        var slotLabs = P.labels.filter(function(L){ return L.check.every(function(q){ return pip(q, rings); }); });
+        var boxes = slotLabs.map(function(L){ return ringsBox(L.check); });
+        var nameSize = Math.min(o.labelH*1.5, Math.max(1.5, (e.bbox[3]-e.bbox[1])*0.35));
+        var nw = textWidth(name, nameSize), cands = labelCandidates(e.outer, e.holes);
+        for (var ci=0; ci<cands.length; ci++){
+          var lp = cands[ci]; if (lp.len < nw + nameSize) continue;
+          var bx = [lp.p[0]-nw/2-1, lp.p[1]-nameSize/2-1, lp.p[0]+nw/2+1, lp.p[1]+nameSize/2+1];
+          if (![[bx[0],bx[1]],[bx[2],bx[1]],[bx[2],bx[3]],[bx[0],bx[3]]].every(function(q){ return pip(q, rings); })) continue;
+          if (boxes.some(function(q){ return q[0] < bx[2] && q[2] > bx[0] && q[1] < bx[3] && q[3] > bx[1]; })) continue;
+          labels.push({ u: lp.p[0], v: lp.p[1], text: name, size: nameSize, angle: 0, main: true }); break;
+        }
+        slotLabs.forEach(function(L){ labels.push(L); });
+      }
+      parts.push({ name: name, panel: P, fam: P.fam, outer: e.outer, holes: e.holes, bbox: e.bbox, area: e.area,
+        slots: e.joints || 0, labels: labels, cut: rings.reduce(function(s,rr){ return s + perim(rr); }, 0) });
+    });
+  });
+  if (skipped) warnings.push(skipped + ' crossing' + (skipped>1?'s':'') + ' too close to an edge to hold a joint ' + (skipped>1?'were':'was') + ' notched on one side only.');
+  if (loose) warnings.push(loose + ' part' + (loose>1?'s':'') + ' with no joints ' + (loose>1?'were':'was') + ' removed. Add more panels if you want them kept.');
+  if (dropped) warnings.push(dropped + ' small piece' + (dropped>1?'s were':' was') + ' under the minimum part size (' + minArea.toFixed(0) + ' mm²) and left out.');
+  return { parts: parts, joints: joints, warnings: warnings, panels: panels, hub: hubR };
+}
+
+function nest(parts, o){
+  var W = o.sheetW, H = o.sheetH, m = o.margin, g = o.gap;
+  var sheets = [], over = [];
+  var items = parts.map(function(p){
+    var bw = p.bbox[2]-p.bbox[0], bh = p.bbox[3]-p.bbox[1];
+    var oris = [{ rot: 0, w: bw, h: bh }, { rot: 1, w: bh, h: bw }].filter(function(q){ return q.w <= W-2*m + 1e-6 && q.h <= H-2*m + 1e-6; });
+    oris.sort(function(a,b){ return a.h - b.h; });
+    return { p: p, oris: oris, key: oris.length ? oris[0].h : 0 };
+  });
+  items.sort(function(a,b){ return b.key - a.key || (b.oris[0]?b.oris[0].w:0) - (a.oris[0]?a.oris[0].w:0); });
+  function newSheet(){ var s = { w: W, h: H, shelves: [], y: m, place: [] }; sheets.push(s); return s; }
+  function place(p, rot, x, y){
+    var b = p.bbox;
+    var f = rot ? function(pt){ return [b[3] - pt[1] + x, pt[0] - b[0] + y]; } : function(pt){ return [pt[0] - b[0] + x, pt[1] - b[1] + y]; };
+    return { part: p, rot: rot, outer: p.outer.map(f), holes: p.holes.map(function(h){ return h.map(f); }),
+      labels: p.labels.map(function(L){
+        var q = f([L.u, L.v]), ang = (L.angle || 0) + (rot ? 90 : 0);
+        if (ang > 90.01) ang -= 180;
+        return { main: L.main, lines: textStrokes(L.text, q[0], q[1], L.size, ang) };
+      }) };
+  }
+  items.forEach(function(it){
+    if (!it.oris.length){
+      var bw = it.p.bbox[2]-it.p.bbox[0], bh = it.p.bbox[3]-it.p.bbox[1];
+      var s0 = { w: bw+2*m, h: bh+2*m, shelves: [], y: m, place: [], oversize: true };
+      s0.place.push(place(it.p, 0, m, m)); over.push(it.p.name); sheets.push(s0); return;
+    }
+    for (var si=0; si<sheets.length; si++){ var s = sheets[si]; if (s.oversize) continue;
+      for (var hi=0; hi<s.shelves.length; hi++){ var sh = s.shelves[hi];
+        for (var oi=0; oi<it.oris.length; oi++){ var q = it.oris[oi];
+          if (q.h <= sh.h + 1e-6 && sh.x + q.w <= W - m + 1e-6){ s.place.push(place(it.p, q.rot, sh.x, sh.y)); sh.x += q.w + g; return; }
+        }
+      }
+    }
+    for (var oi2=0; oi2<it.oris.length; oi2++){ var q2 = it.oris[oi2];
+      for (var sj=0; sj<sheets.length; sj++){ var s2 = sheets[sj]; if (s2.oversize) continue;
+        if (s2.y + q2.h <= H - m + 1e-6){ var sh2 = { y: s2.y, h: q2.h, x: m + q2.w + g }; s2.shelves.push(sh2); s2.y += q2.h + g; s2.place.push(place(it.p, q2.rot, m, sh2.y)); return; }
+      }
+    }
+    var s3 = newSheet(), q3 = it.oris[0];
+    s3.shelves.push({ y: m, h: q3.h, x: m + q3.w + g }); s3.y = m + q3.h + g; s3.place.push(place(it.p, q3.rot, m, m));
+  });
+  sheets.sort(function(a,b){ return (a.oversize?1:0) - (b.oversize?1:0); });
+  sheets.forEach(function(s, i){ s.index = i+1; s.place.forEach(function(pl){ pl.part.sheet = i+1; }); });
+  return { sheets: sheets, oversize: over };
+}
+
+function f3(x){ return (Math.round(x*1000)/1000).toString(); }
+function dxfSheet(s, o){
+  var L = [];
+  function g(c, v){ L.push(String(c)); L.push(String(v)); }
+  g(0,'SECTION'); g(2,'HEADER'); g(9,'$ACADVER'); g(1,'AC1009'); g(9,'$INSUNITS'); g(70,4); g(9,'$MEASUREMENT'); g(70,1); g(0,'ENDSEC');
+  g(0,'SECTION'); g(2,'TABLES');
+  g(0,'TABLE'); g(2,'LTYPE'); g(70,1); g(0,'LTYPE'); g(2,'CONTINUOUS'); g(70,0); g(3,'Solid line'); g(72,65); g(73,0); g(40,0); g(0,'ENDTAB');
+  var layers = [['CUT_OUTER',1],['CUT_INNER',5],['LABELS',3],['SHEET',8]];
+  g(0,'TABLE'); g(2,'LAYER'); g(70,layers.length);
+  layers.forEach(function(l){ g(0,'LAYER'); g(2,l[0]); g(70,0); g(62,l[1]); g(6,'CONTINUOUS'); });
+  g(0,'ENDTAB'); g(0,'ENDSEC');
+  g(0,'SECTION'); g(2,'ENTITIES');
+  function poly(r, layer, closed){
+    g(0,'POLYLINE'); g(8,layer); g(66,1); g(10,0); g(20,0); g(30,0); g(70, closed ? 1 : 0);
+    r.forEach(function(p){ g(0,'VERTEX'); g(8,layer); g(10,f3(p[0])); g(20,f3(p[1])); g(30,0); });
+    g(0,'SEQEND'); g(8,layer);
+  }
+  if (o.sheetLine) poly([[0,0],[s.w,0],[s.w,s.h],[0,s.h]], 'SHEET', true);
+  s.place.forEach(function(pl){
+    poly(pl.outer, 'CUT_OUTER', true);
+    pl.holes.forEach(function(h){ poly(h, 'CUT_INNER', true); });
+    pl.labels.forEach(function(t){ t.lines.forEach(function(ln){ poly(ln, 'LABELS', false); }); });
+  });
+  g(0,'ENDSEC'); g(0,'EOF');
+  return L.join('\n') + '\n';
+}
+function famFill(f){ return f === 'B' || f === 'R' ? 'var(--ply-b)' : f === 'K' ? 'var(--ply-k)' : 'var(--ply)'; }
+function svgSheet(s, o, preview){
+  var H = s.h;
+  function pts(r){ return r.map(function(p){ return f3(p[0]) + ' ' + f3(H - p[1]); }).join('L'); }
+  function d(r){ return 'M' + pts(r) + 'Z'; }
+  var out = [];
+  out.push('<svg xmlns="http://www.w3.org/2000/svg" ' + (preview ? '' : 'width="' + f3(s.w) + 'mm" height="' + f3(s.h) + 'mm" ') + 'viewBox="0 0 ' + f3(s.w) + ' ' + f3(s.h) + '">');
+  if (preview){
+    out.push('<defs><pattern id="g10" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="var(--mat-grid)" stroke-width="0.6"/></pattern><pattern id="g100" width="100" height="100" patternUnits="userSpaceOnUse"><rect width="100" height="100" fill="url(#g10)"/><path d="M100 0H0V100" fill="none" stroke="var(--mat-grid2)" stroke-width="1"/></pattern></defs>');
+    out.push('<rect width="' + s.w + '" height="' + s.h + '" fill="var(--mat)"/><rect width="' + s.w + '" height="' + s.h + '" fill="url(#g100)"/>');
+  } else if (o.sheetLine){
+    out.push('<rect width="' + f3(s.w) + '" height="' + f3(s.h) + '" fill="none" stroke="#999999" stroke-width="0.1"/>');
+  }
+  s.place.forEach(function(pl){
+    if (preview) out.push('<path class="part" data-part="' + pl.part.name + '" d="' + d(pl.outer) + pl.holes.map(d).join('') + '" fill="' + famFill(pl.part.fam) + '" fill-rule="evenodd" stroke="var(--ply-edge)" stroke-width="0.6"/>');
+    else {
+      out.push('<path d="' + d(pl.outer) + '" fill="none" stroke="#ff0000" stroke-width="0.1"/>');
+      pl.holes.forEach(function(h){ out.push('<path d="' + d(h) + '" fill="none" stroke="#0000ff" stroke-width="0.1"/>'); });
+    }
+    pl.labels.forEach(function(t){
+      if (!t.lines.length) return;
+      var dd = t.lines.map(function(ln){ return 'M' + pts(ln); }).join('');
+      out.push(preview ? '<path d="' + dd + '" fill="none" stroke="var(--ply-edge)" stroke-width="' + (t.main ? 0.7 : 0.45) + '" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"/>'
+                       : '<path d="' + dd + '" fill="none" stroke="#000000" stroke-width="0.1"/>');
+    });
+  });
+  out.push('</svg>');
+  return out.join('\n');
+}
+
+// ---------- sample models (triangle soup, mm) ----------
+function ringsSurface(rings, pb, pt){
+  var out = [], M = rings[0].length;
+  function tri(a,b,c){ out.push(a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2]); }
+  for (var j=0;j<M;j++){ var k=(j+1)%M; tri(pb, rings[0][k], rings[0][j]); }
+  for (var i=0;i+1<rings.length;i++) for (var j2=0;j2<M;j2++){ var k2=(j2+1)%M, a=rings[i][j2], b=rings[i][k2], c=rings[i+1][k2], d=rings[i+1][j2]; tri(a,b,c); tri(a,c,d); }
+  var last = rings[rings.length-1]; for (var j3=0;j3<M;j3++){ var k3=(j3+1)%M; tri(pt, last[j3], last[k3]); }
+  return out;
+}
+function ring(r, z, M){ var l = []; M = M || 72; for (var j=0;j<M;j++){ var a = 2*Math.PI*j/M; l.push([r*Math.cos(a), r*Math.sin(a), z]); } return l; }
+function sampleBlob(){
+  var R = 48, M = 72, rings = [];
+  for (var i=1;i<R;i++){ var th = Math.PI*i/R, rg = [];
+    for (var j=0;j<M;j++){ var ph = 2*Math.PI*j/M;
+      var r = 100*(1 + 0.16*Math.sin(3*th)*Math.cos(2*ph) + 0.1*Math.cos(4*ph + th) + 0.08*Math.sin(5*th));
+      rg.push([r*Math.sin(th)*Math.cos(ph)*1.15, r*Math.sin(th)*Math.sin(ph)*0.85, 100 - r*Math.cos(th)*0.9]); }
+    rings.push(rg); }
+  return { pos: new Float32Array(ringsSurface(rings, [0,0,10], [0,0,190])) };
+}
+function sampleVase(){
+  var Hh = 240, R = 80, rings = [];
+  for (var i=0;i<=R;i++){ var z = Hh*i/R, t = z/Hh;
+    var r = 38 + 52*Math.sin(Math.PI*Math.min(1, t*1.05))*Math.exp(-2.2*t) + 22*Math.pow(t, 6) + 6*Math.sin(t*20)*Math.exp(-3*t);
+    rings.push(ring(r, z)); }
+  return { pos: new Float32Array(ringsSurface(rings, [0,0,0], [0,0,Hh])) };
+}
+function samplePot(){
+  var H = 120, depth = 6, rec = 45, rings = [];
+  for (var i=0;i<=40;i++){ var z = H*i/40; rings.push(ring(50 + 28*Math.sin(Math.PI*0.85*z/H), z)); }
+  rings.push(ring(rec, H)); rings.push(ring(rec, H - depth));
+  var pot = ringsSurface(rings, [0,0,0], [0,0,H - depth]);
+  var lid = ringsSurface([ring(rec - 0.05, H - depth + 0.01), ring(rec - 0.05, H)], [0,0,H - depth + 0.01], [0,0,H]);
+  var names = []; for (var a=0;a<pot.length/9;a++) names.push('Pot'); for (var b=0;b<lid.length/9;b++) names.push('Lid');
+  return { pos: new Float32Array(pot.concat(lid)), triNames: names };
+}
+function sampleIsland(){
+  var N = 72, S = 300, base = 6, top = [], i, j;
+  function h(x, y){
+    var dx = x - 18, dy = y + 12, r = Math.hypot(dx, dy);
+    var v = 112*Math.exp(-Math.pow(r/72, 2)) - 34*Math.exp(-Math.pow(r/12, 2)) + 26*Math.exp(-(Math.pow(x+82,2)+Math.pow(y-68,2))/2400) + 5*Math.sin(x/16)*Math.cos(y/21) + 3*Math.cos((x+y)/9);
+    var rc = Math.hypot(x*1.05, y) / 142, fall = Math.max(0, 1 - Math.pow(rc, 5));
+    return Math.max(0, v*fall);
+  }
+  for (i=0;i<=N;i++){ top.push([]); for (j=0;j<=N;j++){ var x = -S/2 + S*i/N, y = -S/2 + S*j/N; top[i].push([x, y, base + h(x, y)]); } }
+  var out = [];
+  function tri(a,b,c){ out.push(a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2]); }
+  function bot(p){ return [p[0], p[1], 0]; }
+  for (i=0;i<N;i++) for (j=0;j<N;j++){
+    var a = top[i][j], b = top[i+1][j], c = top[i+1][j+1], d = top[i][j+1];
+    tri(a,b,c); tri(a,c,d); tri(bot(a),bot(c),bot(b)); tri(bot(a),bot(d),bot(c));
+  }
+  var edge = [];
+  for (i=0;i<N;i++) edge.push(top[i][0]); for (j=0;j<N;j++) edge.push(top[N][j]);
+  for (i=N;i>0;i--) edge.push(top[i][N]); for (j=N;j>0;j--) edge.push(top[0][j]);
+  for (i=0;i<edge.length;i++){ var p = edge[i], q = edge[(i+1)%edge.length]; tri(p, bot(p), bot(q)); tri(p, bot(q), q); }
+  return { pos: new Float32Array(out) };
+}
+// CORE END
+</script>
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var state = { moves: {}, preview: null, raw: null, R: [1,0,0,0,1,0,0,0,1], roles: [], model: null, result: null, layout: null, sel: null, name: 'island' };
+  // Colour theme: auto follows the system; light/dark pin it. Remembered per browser.
+  function applyTheme(v){ if (v === 'light' || v === 'dark') document.documentElement.setAttribute('data-theme', v); else document.documentElement.removeAttribute('data-theme'); }
+  (function(){
+    var saved = 'auto'; try { saved = localStorage.getItem('3d2cnc-theme') || 'auto'; } catch(e){}
+    var el = document.querySelector('input[name="theme"][value="' + saved + '"]'); if (el) el.checked = true;
+    applyTheme(saved);
+    document.querySelectorAll('input[name="theme"]').forEach(function(r){ r.addEventListener('change', function(){ applyTheme(r.value); try { localStorage.setItem('3d2cnc-theme', r.value); } catch(e){} }); });
+  })();
+  var dlPromise = null;
+  try { if (window.claude && window.claude.use) dlPromise = window.claude.use('downloads'); } catch(e){}
+
+  function toast(msg){ var t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(function(){ t.classList.remove('on'); }, 3000); }
+  function num(id, d){ var v = parseFloat($(id).value); return isFinite(v) ? v : d; }
+  function radio(name){ return document.querySelector('input[name="' + name + '"]:checked').value; }
+  function setRadio(name, val){ var el = document.querySelector('input[name="' + name + '"][value="' + val + '"]'); if (el) el.checked = true; }
+  function opts(){
+    return {
+      method: radio('method'), machine: radio('machine'), flip: radio('flip') === '1',
+      pair: $('pair').value.split(',').map(Number), stackAxis: +$('stackAxis').value,
+      countA: Math.max(1, Math.min(80, Math.round(num('countA', 9)))), countB: Math.max(1, Math.min(80, Math.round(num('countB', 9)))),
+      fins: Math.max(2, Math.min(72, Math.round(num('fins', 12)))), rings: Math.max(1, Math.min(80, Math.round(num('rings', 6)))), hub: Math.max(0, num('hub', 0)),
+      thick: Math.max(0.5, num('thick', 6)), clear: Math.max(0, num('clear', 0.2)), bit: Math.max(0.1, num('bit', 3.175)),
+      relief: $('relief').value, kerf: Math.max(0, num('kerf', 0.15)), kerfComp: $('kerfComp').checked,
+      sheetW: Math.max(50, num('sheetW', 1220)), sheetH: Math.max(50, num('sheetH', 610)), margin: Math.max(0, num('margin', 10)), gap: Math.max(0, num('gap', 8)),
+      dropLoose: $('dropLoose').checked, minSize: Math.max(0, num('minSize', 20)), keepClear: Math.max(0, num('keepClear', 0.5)),
+      labels: $('labels').checked, labelH: Math.max(1, num('labelH', 4)), sheetLine: $('sheetLine').checked,
+      fitAxis: $('fitAxis').value, fitVal: Math.max(10, num('fitVal', 300)), moves: state.moves
+    };
+  }
+  function syncVisibility(){
+    var o = opts();
+    function show(sel, on){ document.querySelectorAll(sel).forEach(function(e){ e.hidden = !on; }); }
+    show('.cnc-only', o.machine === 'cnc'); show('.laser-only', o.machine === 'laser');
+    show('.crate-only', o.method === 'interlock'); show('.rad-only', o.method === 'radial'); show('.stk-only', o.method === 'stack');
+    show('.join-only', o.method !== 'stack');
+    $('fitVal').disabled = o.fitAxis === 'file';
+  }
+  function legend(){
+    var o = opts(), ax = ['X','Y','Z'], items;
+    if (o.method === 'interlock') items = [['var(--ply)', 'A ⟂ ' + ax[o.pair[0]]], ['var(--ply-b)', 'B ⟂ ' + ax[o.pair[1]]]];
+    else if (o.method === 'radial') items = [['var(--ply)', 'H rings'], ['var(--ply-b)', 'R fins']];
+    else items = [['var(--ply)', 'Layers ⟂ ' + ax[o.stackAxis]]];
+    if (state.roles.indexOf('keepcut') >= 0) items.push(['var(--ply-k)', 'K inserts']);
+    var el = $('legend'); el.innerHTML = '';
+    items.forEach(function(it){ var s = document.createElement('span'), i = document.createElement('i'); i.className = 'sw'; i.style.background = it[0]; s.appendChild(i); s.appendChild(document.createTextNode(it[1])); el.appendChild(s); });
+  }
+
+  // ---------- 3D ----------
+  var cv = $('cv'), renderer, scene, camera, controls, root, ghostGrp, partsGrp, grid, meshes = {};
+  var has3D = typeof THREE !== 'undefined';
+  if (has3D){
+    renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(38, 1, 1, 20000);
+    controls = new THREE.OrbitControls(camera, cv); controls.enableDamping = true;
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x556655, 0.75));
+    var dl = new THREE.DirectionalLight(0xffffff, 0.75); dl.position.set(1, 2, 1.4); scene.add(dl);
+    var dl2 = new THREE.DirectionalLight(0xffffff, 0.25); dl2.position.set(-1.5, 0.6, -1); scene.add(dl2);
+    root = new THREE.Group(); root.rotation.x = -Math.PI/2; scene.add(root);
+    ghostGrp = new THREE.Group(); partsGrp = new THREE.Group(); root.add(ghostGrp); root.add(partsGrp);
+    new ResizeObserver(resize).observe(cv);
+    (function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+  }
+  function resize(){ if (!has3D) return; var w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w/h; camera.updateProjectionMatrix(); }
+  function clearGroup(gp){ while (gp.children.length){ var c = gp.children.pop(); c.traverse(function(x){ if (x.geometry) x.geometry.dispose(); }); } }
+  function frameCamera(){
+    if (!has3D || !state.model) return;
+    var m = state.model, size = Math.max(m.max[0]-m.min[0], m.max[1]-m.min[1], m.max[2]-m.min[2]) || 100;
+    var cz = (m.max[2]+m.min[2])/2;
+    controls.target.set(0, cz, 0);
+    camera.position.set(size*1.25, cz + size*0.85, size*1.5);
+    camera.near = size/100; camera.far = size*40; camera.updateProjectionMatrix();
+    if (grid){ scene.remove(grid); grid.geometry.dispose(); }
+    var gs = Math.ceil(size*1.6/50)*50;
+    grid = new THREE.GridHelper(gs, gs/10, 0x5f8a77, 0x9fb5aa); grid.material.transparent = true; grid.material.opacity = 0.35; grid.position.y = -0.2; scene.add(grid);
+  }
+  function setGhost(){
+    if (!has3D) return;
+    clearGroup(ghostGrp);
+    state.model.bodies.forEach(function(b){
+      if (b.role === 'ignore') return;
+      var T = b.tris, V = b.verts, pos = new Float32Array(T.length*3);
+      for (var i=0;i<T.length;i++){ pos[i*3]=V[T[i]*3]; pos[i*3+1]=V[T[i]*3+1]; pos[i*3+2]=V[T[i]*3+2]; }
+      var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.computeVertexNormals();
+      var keep = b.role !== 'slice';
+      ghostGrp.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: keep ? 0xd9822b : 0x5fae8d, transparent: true, opacity: keep ? 0.32 : 0.16, depthWrite: false, side: THREE.DoubleSide, roughness: 0.8 })));
+    });
+    ghostGrp.visible = $('ghost').checked;
+  }
+  var mats = null, edgeMat, matSel;
+  function famMat(f){ return f === 'B' || f === 'R' ? mats.b : f === 'K' ? mats.k : mats.a; }
+  function build3D(res, o){
+    if (!has3D) return;
+    clearGroup(partsGrp); meshes = {};
+    if (!mats){
+      mats = { a: new THREE.MeshStandardMaterial({ color: 0xe3c28c, roughness: 0.85, side: THREE.DoubleSide }),
+               b: new THREE.MeshStandardMaterial({ color: 0xc39257, roughness: 0.85, side: THREE.DoubleSide }),
+               k: new THREE.MeshStandardMaterial({ color: 0xa9c3cf, roughness: 0.7, side: THREE.DoubleSide }) };
+      matSel = new THREE.MeshStandardMaterial({ color: 0xffd84a, roughness: 0.6, emissive: 0x332a00, side: THREE.DoubleSide });
+      edgeMat = new THREE.LineBasicMaterial({ color: 0x6e4f27, transparent: true, opacity: 0.55 });
+    }
+    res.parts.forEach(function(p){
+      var F = p.panel.F, sh = new THREE.Shape(p.outer.map(function(q){ return new THREE.Vector2(q[0], q[1]); }));
+      p.holes.forEach(function(h){ sh.holes.push(new THREE.Path(h.map(function(q){ return new THREE.Vector2(q[0], q[1]); }))); });
+      var geo = new THREE.ExtrudeGeometry(sh, { depth: o.thick, bevelEnabled: false, curveSegments: 1 });
+      var mesh = new THREE.Mesh(geo, famMat(p.fam));
+      mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), edgeMat));
+      var M = new THREE.Matrix4().makeBasis(new THREE.Vector3().fromArray(F.eu), new THREE.Vector3().fromArray(F.ev), new THREE.Vector3().fromArray(F.en));
+      var base = add(F.O, scl(F.en, -o.thick/2)); M.setPosition(base[0], base[1], base[2]);
+      mesh.matrixAutoUpdate = false; mesh.matrix.copy(M);
+      mesh.userData = { base: famMat(p.fam), M0: M.clone(), lift: p.panel.liftDir || null, panel: p.panel, partName: p.name };
+      partsGrp.add(mesh); meshes[p.name] = mesh;
+    });
+    applyLift(); applySel();
+  }
+  function applyLift(){
+    if (!has3D || !state.model) return;
+    var m = state.model, ext = Math.max(m.max[0]-m.min[0], m.max[1]-m.min[1], m.max[2]-m.min[2]);
+    var amt = (+$('lift').value/100) * ext * 0.9;
+    Object.keys(meshes).forEach(function(k){
+      var me = meshes[k], L = me.userData.lift;
+      me.matrix.copy(me.userData.M0);
+      var pv = state.preview;
+      if (pv && me.userData.panel.name === pv.name){
+        if (pv.mode === 'rot') me.matrix.premultiply(new THREE.Matrix4().makeRotationZ(pv.value*Math.PI/180));
+        else { var en = me.userData.panel.F.en; me.matrix.premultiply(new THREE.Matrix4().makeTranslation(en[0]*pv.value, en[1]*pv.value, en[2]*pv.value)); }
+      }
+      if (L && amt) me.matrix.premultiply(new THREE.Matrix4().makeTranslation(L[0]*amt, L[1]*amt, L[2]*amt));
+      me.matrixWorldNeedsUpdate = true;
+    });
+  }
+  function applySel(){
+    Object.keys(meshes).forEach(function(k){ meshes[k].material = k === state.sel ? matSel : meshes[k].userData.base; });
+    document.querySelectorAll('#vsheets .part').forEach(function(e){ var on = e.getAttribute('data-part') === state.sel; e.setAttribute('stroke', on ? 'var(--sel)' : 'var(--ply-edge)'); e.setAttribute('stroke-width', on ? '2.5' : '0.6'); });
+    document.querySelectorAll('#vparts tbody tr').forEach(function(tr){ tr.classList.toggle('sel', tr.getAttribute('data-part') === state.sel); });
+  }
+  function select(name){ state.sel = state.sel === name ? null : name; applySel(); snapUI(); }
+
+  // ---------- dragging panels ----------
+  function moveUI(){
+    var n = Object.keys(state.moves).filter(function(k){ return state.moves[k]; }).length, pv = state.preview, el = $('moveInfo');
+    if (pv){ var tot = pv.base + pv.value; el.textContent = pv.name + ': ' + (tot > 0 ? '+' : '') + tot.toFixed(1) + (pv.mode === 'rot' ? '°' : ' mm'); }
+    else if (n) el.textContent = n + ' panel' + (n > 1 ? 's' : '') + ' moved';
+    else el.textContent = 'Drag a panel to move it';
+    $('resetMoves').hidden = !n || opts().method === 'stack';
+  }
+  // Axis-aligned panels can be placed flush with either end of the model along their normal.
+  function panelAxis(P){ if (!P || 'ABHL'.indexOf(P.fam) < 0) return -1; return P.F.en.indexOf(1); }
+  function panelRange(k){ var t = opts().thick, m = state.model; return [m.sMin[k] + t/2, m.sMax[k] - t/2]; }
+  function selectedPanel(){ if (!state.sel || !state.result) return null; var p = state.result.parts.filter(function(q){ return q.name === state.sel; })[0]; return p ? p.panel : null; }
+  function snapUI(){
+    var P = selectedPanel(), k = panelAxis(P), ok = k >= 0 && P.fam !== 'L';
+    $('snapMin').hidden = $('snapMax').hidden = !ok;
+    if (ok){ $('snapMin').textContent = k === 2 ? P.name + ' to floor' : P.name + ' to −' + 'XYZ'[k] + ' end'; $('snapMax').textContent = k === 2 ? P.name + ' to top' : P.name + ' to +' + 'XYZ'[k] + ' end'; }
+  }
+  function snapTo(end){
+    var P = selectedPanel(), k = panelAxis(P); if (k < 0) return;
+    var cur = P.F.O[k], generated = cur - (state.moves[P.name] || 0), target = panelRange(k)[end];
+    state.moves[P.name] = Math.round((target - generated)*1000)/1000;
+    recompute(); toast(P.name + ' placed flush with the ' + (k === 2 ? (end ? 'top' : 'floor') : (end ? '+' : '−') + 'XYZ'[k] + ' end') + '.');
+  }
+  $('snapMin').addEventListener('click', function(){ snapTo(0); });
+  $('snapMax').addEventListener('click', function(){ snapTo(1); });
+  $('resetMoves').addEventListener('click', function(){ clearMoves(); recompute(); toast('Panels returned to their generated positions.'); });
+  if (has3D){
+    var ray = new THREE.Raycaster(), drag = null;
+    var ndc = function(e){ var r = cv.getBoundingClientRect(); return new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1); };
+    var localRay = function(e){ ray.setFromCamera(ndc(e), camera); root.updateMatrixWorld(true); return ray.ray.clone().applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert()); };
+    // Drag value: distance along the panel normal (mm), or angle about the vertical axis for radial fins (degrees).
+    var measure = function(d, r){
+      if (d.mode === 'rot'){
+        if (Math.abs(r.direction.z) < 1e-6) return null;
+        var s = (d.p0.z - r.origin.z)/r.direction.z, q = r.origin.clone().addScaledVector(r.direction, s);
+        return Math.atan2(q.y, q.x)*180/Math.PI;
+      }
+      var n = d.n, w0 = d.p0.clone().sub(r.origin), b = n.dot(r.direction), den = 1 - b*b;
+      if (den < 1e-4) return null;
+      return (b*r.direction.dot(w0) - n.dot(w0))/den;
+    };
+    cv.addEventListener('pointerdown', function(e){
+      if (e.button !== 0 || !state.result) return;
+      ray.setFromCamera(ndc(e), camera); root.updateMatrixWorld(true);
+      var hits = ray.intersectObjects(partsGrp.children, false);
+      if (!hits.length) return;
+      var ud = hits[0].object.userData, P = ud.panel;
+      var movable = 'ABHR'.indexOf(P.fam) >= 0;
+      drag = { x: e.clientX, y: e.clientY, partName: ud.partName, moved: false };
+      if (!movable) return;
+      controls.enabled = false;
+      try { cv.setPointerCapture(e.pointerId); } catch(err){}
+      drag.panel = P; drag.name = P.name; drag.mode = P.fam === 'R' ? 'rot' : 'move';
+      drag.p0 = hits[0].point.clone().applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert());
+      drag.n = new THREE.Vector3().fromArray(P.F.en);
+      drag.start = measure(drag, localRay(e));
+      if (drag.start === null) drag.panel = null;
+    }, true);
+    cv.addEventListener('pointermove', function(e){
+      if (!drag || !drag.panel) return;
+      if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 3) drag.moved = true;
+      if (!drag.moved) return;
+      var v = measure(drag, localRay(e)); if (v === null) return;
+      var dv = v - drag.start;
+      if (drag.mode === 'rot'){ dv = ((dv + 540) % 360) - 180; dv = Math.round(dv*2)/2; }
+      else {
+        dv = Math.round(dv*2)/2;
+        var k = panelAxis(drag.panel);
+        if (k >= 0){
+          var rg = panelRange(k), cur = drag.panel.F.O[k], np = cur + dv;
+          if (np <= rg[0] + 2) np = rg[0]; if (np >= rg[1] - 2) np = rg[1];
+          dv = np - cur;
+        }
+      }
+      state.preview = { name: drag.name, mode: drag.mode, value: dv, base: state.moves[drag.name] || 0 };
+      applyLift(); moveUI();
+    });
+    var endDrag = function(){
+      if (!drag) return;
+      controls.enabled = true;
+      var d = drag; drag = null;
+      if (!d.moved){ state.preview = null; select(d.partName); return; }
+      if (d.panel && state.preview && state.preview.value){ state.moves[d.name] = (state.moves[d.name] || 0) + state.preview.value; }
+      state.preview = null; moveUI(); recompute();
+    };
+    cv.addEventListener('pointerup', endDrag);
+    cv.addEventListener('pointercancel', endDrag);
+  }
+
+  // ---------- bodies ----------
+  var ROLE_LABELS = [['slice', 'Slice'], ['keep', 'Keep-out'], ['keepcut', 'Keep-out + cut part'], ['ignore', 'Ignore']];
+  function renderBodies(){
+    var el = $('bodies'); el.innerHTML = '';
+    var bodies = state.model.bodies;
+    if (bodies.length < 2){
+      var p = document.createElement('p'); p.className = 'hint';
+      p.textContent = 'One body found. To reserve space for a lid or insert, include it in the file as a separate body (STL shell, OBJ object or 3MF part), then mark it Keep-out.';
+      el.appendChild(p); $('keepRow').hidden = true; return;
+    }
+    $('keepRow').hidden = state.roles.every(function(r){ return r === 'slice' || r === 'ignore'; });
+    bodies.forEach(function(b, i){
+      var row = document.createElement('div'); row.className = 'body' + (b.role === 'keep' || b.role === 'keepcut' ? ' keep' : '');
+      var nm = document.createElement('b'); nm.textContent = b.name; nm.title = b.name;
+      var dims = document.createElement('small'); dims.textContent = [0,1,2].map(function(k){ return (b.max[k]-b.min[k]).toFixed(1); }).join(' × ') + ' mm';
+      var wrap = document.createElement('div'); wrap.className = 'in';
+      var sel = document.createElement('select'); sel.id = 'role-' + i; sel.setAttribute('aria-label', 'Role for ' + b.name);
+      ROLE_LABELS.forEach(function(r){ var op = document.createElement('option'); op.value = r[0]; op.textContent = r[1]; if (r[0] === b.role) op.selected = true; sel.appendChild(op); });
+      sel.addEventListener('change', function(){ state.roles[i] = sel.value; remesh(false); });
+      wrap.appendChild(sel); row.appendChild(nm); row.appendChild(wrap); row.appendChild(dims); el.appendChild(row);
+    });
+    var h = document.createElement('p'); h.className = 'hint';
+    h.textContent = 'Keep-out bodies reserve space: every panel is trimmed clear of them through its full thickness. "+ cut part" also exports the body as a flat part (K).';
+    el.appendChild(h);
+  }
+
+  // ---------- pipeline ----------
+  function loadRaw(parsed, name, roles){
+    state.raw = weld(parsed.pos);
+    state.raw.bodies = splitBodies(state.raw, parsed.triNames);
+    state.roles = state.raw.bodies.map(function(_, i){ return (roles && roles[i]) || 'slice'; });
+    state.R = [1,0,0,0,1,0,0,0,1]; state.name = name;
+    if (state.raw.tris.length/3 > 600000) toast('Large mesh: slicing may take a few seconds.');
+    remesh(true);
+  }
+  function clearMoves(){ var had = Object.keys(state.moves).length; state.moves = {}; state.preview = null; moveUI(); return had; }
+  function remesh(reframe){
+    if (reframe) clearMoves();
+    var o = opts();
+    state.model = transformModel(state.raw, state.R, state.roles, o.fitAxis, o.fitVal);
+    var m = state.model;
+    $('dims').textContent = (m.max[0]-m.min[0]).toFixed(1) + ' × ' + (m.max[1]-m.min[1]).toFixed(1) + ' × ' + (m.max[2]-m.min[2]).toFixed(1) + ' mm (X × Y × Z) · ' + (state.raw.tris.length/3).toLocaleString() + ' triangles' + (o.fitAxis === 'file' ? '' : ' · scale ' + m.scale.toFixed(3));
+    renderBodies(); setGhost(); if (reframe) frameCamera(); legend();
+    recompute();
+  }
+  var timer = null;
+  function schedule(){ clearTimeout(timer); $('busy').hidden = false; timer = setTimeout(recompute, 180); }
+  function recompute(){
+    if (!state.model) return;
+    clearTimeout(timer); $('busy').hidden = false;
+    setTimeout(function(){
+      try {
+        var o = opts();
+        var res = buildParts(state.model, o);
+        var lay = nest(res.parts, o);
+        state.result = res; state.layout = lay;
+        if (lay.oversize.length) res.warnings.push('Too big for the sheet, placed on their own oversize sheets: ' + lay.oversize.join(', ') + '. Use a smaller model or a larger sheet.');
+        if (!res.parts.length && !res.warnings.length) res.warnings.push('No parts were produced. Check that the model is a closed solid and the slice counts are above zero.');
+        build3D(res, o); renderSheets(lay); renderParts(res, o); legend();
+        var cut = res.parts.reduce(function(s,p){ return s + p.cut; }, 0);
+        $('sParts').textContent = res.parts.length; $('sJoints').textContent = o.method !== 'stack' ? res.joints : '–';
+        $('sSheets').textContent = lay.sheets.length; $('sCut').textContent = (cut/1000).toFixed(1) + ' m';
+        $('tsheets').textContent = 'Sheets (' + lay.sheets.length + ')'; $('tparts').textContent = 'Parts (' + res.parts.length + ')';
+        $('dlSvg').disabled = !lay.sheets.length; moveUI(); snapUI();
+        var w = $('warns'); w.innerHTML = ''; res.warnings.forEach(function(t){ var d = document.createElement('div'); d.textContent = t; w.appendChild(d); });
+      } catch (e) { console.error(e); toast('Slicing failed: ' + e.message); }
+      $('busy').hidden = true;
+    }, 10);
+  }
+  function renderSheets(lay){
+    var v = $('vsheets'); v.innerHTML = '';
+    lay.sheets.forEach(function(s){
+      var used = s.place.reduce(function(a,pl){ return a + pl.part.area; }, 0);
+      var div = document.createElement('div'); div.className = 'sheet';
+      div.innerHTML = '<h3>Sheet ' + s.index + (s.oversize ? ' (oversize)' : '') + '<small>' + s.w.toFixed(0) + ' × ' + s.h.toFixed(0) + ' mm · ' + s.place.length + ' parts · ' + Math.round(100*used/(s.w*s.h)) + '% used</small></h3><div class="wrap">' + svgSheet(s, opts(), true) + '</div>';
+      v.appendChild(div);
+    });
+    v.querySelectorAll('.part').forEach(function(e){ e.addEventListener('click', function(){ select(e.getAttribute('data-part')); }); });
+  }
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function renderParts(res, o){
+    var v = $('vparts');
+    var guide = o.method === 'interlock'
+      ? 'Stand the ' + (o.flip ? 'B' : 'A') + ' panels upright in order, then lower each ' + (o.flip ? 'A' : 'B') + ' panel from above so its slots engage. The small label beside each slot names the panel that fits there.'
+      : o.method === 'radial'
+      ? 'Support the H rings at their heights (a temporary centre dowel or jig helps), then slide each R fin inward from the outside so its slots engage every ring. Hub radius: ' + (res.hub ? res.hub.toFixed(1) : '–') + ' mm.'
+      : 'Stack the layers in number order from L1 and glue each one down.';
+    if (res.parts.some(function(p){ return p.fam === 'K'; })) guide += ' K parts are your inserts; drop them into the space reserved for them last.';
+    var rows = res.parts.map(function(p){
+      var w = p.bbox[2]-p.bbox[0], h = p.bbox[3]-p.bbox[1];
+      return '<tr data-part="' + esc(p.name) + '"><td class="n"><b>' + esc(p.name) + '</b></td><td class="n">' + esc(p.panel.planeLabel) + '</td><td class="n">' + w.toFixed(1) + ' × ' + h.toFixed(1) + '</td><td class="n">' + (p.area/100).toFixed(1) + '</td><td class="n">' + (o.method !== 'stack' && p.fam !== 'K' ? p.slots : '–') + '</td><td class="n">' + (p.cut/1000).toFixed(2) + '</td><td class="n">' + (p.sheet || '–') + '</td></tr>';
+    }).join('');
+    v.innerHTML = '<p class="assy">' + esc(guide) + '</p><table><thead><tr><th>Part</th><th>Plane</th><th>Size (mm)</th><th>Area (cm²)</th><th>Joints</th><th>Cut (m)</th><th>Sheet</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    v.querySelectorAll('tbody tr').forEach(function(tr){ tr.addEventListener('click', function(){ select(tr.getAttribute('data-part')); }); });
+    applySel();
+  }
+
+  // ---------- export ----------
+  async function saveFile(name, data){
+    var dlc = null;
+    if (dlPromise){ try { dlc = await dlPromise; } catch(e){ dlc = null; } }
+    if (dlc){
+      try { await dlc.save({ filename: name, data: data }); toast('Saved ' + name); }
+      catch (e){ toast(e && e.code === 'declined' ? 'Download cancelled.' : 'Could not save the file: ' + (e && e.message || e)); }
+      return;
+    }
+    var blob = data instanceof Blob ? data : new Blob([data]);
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+  }
+  $('dlZip').addEventListener('click', async function(){
+    if (!state.layout) return;
+    var o = opts(), zip = new JSZip(), base = (state.name || 'model').replace(/[^\w-]+/g, '_');
+    state.layout.sheets.forEach(function(s){
+      var n = base + '_sheet' + String(s.index).padStart(2, '0') + (s.oversize ? '_oversize' : '');
+      zip.file(n + '.dxf', dxfSheet(s, o)); zip.file(n + '.svg', svgSheet(s, o, false));
+    });
+    var csv = ['part,plane,width_mm,height_mm,area_cm2,joints,cut_m,sheet'].concat(state.result.parts.map(function(p){
+      return [p.name, '"' + p.panel.planeLabel.replace(/"/g, "'") + '"', (p.bbox[2]-p.bbox[0]).toFixed(2), (p.bbox[3]-p.bbox[1]).toFixed(2), (p.area/100).toFixed(2), p.slots, (p.cut/1000).toFixed(3), p.sheet].join(',');
+    })).join('\n');
+    zip.file(base + '_cutlist.csv', csv);
+    zip.file('README.txt', '3D2CNC export\nMethod: ' + o.method + '. Stock ' + o.thick + ' mm, slot clearance ' + o.clear + ' mm, ' + (o.machine === 'cnc' ? 'bit ' + o.bit + ' mm, relief ' + o.relief : 'laser, kerf ' + o.kerf + ' mm' + (o.kerfComp ? ' (compensated)' : '')) + '.\nUnits: mm. DXF layers: CUT_OUTER (profile, cut outside), CUT_INNER (holes, cut inside), LABELS (single-stroke engraving, open polylines), SHEET (reference).\nSVG colours: red = outer cut, blue = inner cut, black = engraving.\n');
+    saveFile(base + '_3d2cnc.zip', await zip.generateAsync({ type: 'blob' }));
+  });
+  $('dlSvg').addEventListener('click', function(){
+    if (!state.layout || !state.layout.sheets.length) return;
+    saveFile((state.name || 'model').replace(/[^\w-]+/g, '_') + '_sheet01.svg', svgSheet(state.layout.sheets[0], opts(), false));
+  });
+
+  // ---------- inputs ----------
+  function loadFile(f){
+    if (!f) return;
+    var ext = f.name.split('.').pop().toLowerCase(), rd = new FileReader();
+    rd.onload = async function(){
+      try {
+        var parsed = ext === '3mf' ? await parse3MF(rd.result) : ext === 'obj' ? parseOBJ(new TextDecoder().decode(new Uint8Array(rd.result))) : parseSTL(rd.result);
+        $('fitAxis').value = 'file'; syncVisibility();
+        loadRaw(parsed, f.name.replace(/\.[^.]+$/, ''));
+        var nb = state.raw.bodies.length;
+        toast('Loaded ' + f.name + ' at file size' + (nb > 1 ? ' · ' + nb + ' bodies found' : '') + '.');
+      } catch (e){ toast(e.message || 'Could not read that file.'); }
+    };
+    rd.readAsArrayBuffer(f);
+  }
+  $('file').addEventListener('change', function(e){ loadFile(e.target.files[0]); e.target.value = ''; });
+  ['v3d', 'drop'].forEach(function(id){
+    var el = $(id);
+    el.addEventListener('dragover', function(e){ e.preventDefault(); $('drop').classList.add('over'); });
+    el.addEventListener('dragleave', function(){ $('drop').classList.remove('over'); });
+    el.addEventListener('drop', function(e){ e.preventDefault(); $('drop').classList.remove('over'); loadFile(e.dataTransfer.files[0]); });
+  });
+  var samples = {
+    island: { fn: sampleIsland, fit: '0', size: 300, method: 'interlock' },
+    pot: { fn: samplePot, fit: 'file', size: 120, method: 'radial', roles: ['slice', 'keepcut'] },
+    blob: { fn: sampleBlob, fit: '0', size: 260, method: 'interlock' },
+    vase: { fn: sampleVase, fit: '2', size: 240, method: 'interlock' }
+  };
+  function loadSample(key){
+    var s = samples[key]; $('fitAxis').value = s.fit; $('fitVal').value = s.size; setRadio('method', s.method); syncVisibility();
+    loadRaw(s.fn(), key, s.roles);
+  }
+  $('sample').addEventListener('change', function(){ loadSample($('sample').value); });
+  document.querySelectorAll('[data-rot]').forEach(function(b){ b.addEventListener('click', function(){ if (!state.raw) return; state.R = matMul(rot90(b.getAttribute('data-rot')), state.R); remesh(true); }); });
+  ['fitAxis', 'fitVal'].forEach(function(id){ $(id).addEventListener('change', function(){ syncVisibility(); if (state.raw) remesh(true); }); });
+  document.querySelectorAll('.rail input, .rail select').forEach(function(el){
+    if (['file','sample','fitAxis','fitVal'].indexOf(el.id) >= 0 || el.name === 'theme') return;
+    el.addEventListener(el.type === 'number' ? 'input' : 'change', function(){
+      if (['countA','countB','fins','rings','pair','stackAxis'].indexOf(el.id) >= 0 || el.name === 'method'){ if (clearMoves()) toast('Panel moves were reset because the slice layout changed.'); }
+      syncVisibility(); legend(); schedule();
+    });
+  });
+  $('ghost').addEventListener('change', function(){ if (ghostGrp) ghostGrp.visible = $('ghost').checked; });
+  $('lift').addEventListener('input', applyLift);
+  document.querySelectorAll('.tabs button').forEach(function(b){ b.addEventListener('click', function(){
+    document.querySelectorAll('.tabs button').forEach(function(x){ x.setAttribute('aria-selected', x === b ? 'true' : 'false'); $(x.getAttribute('data-v')).hidden = x !== b; });
+    if (b.id === 't3d') resize();
+  }); });
+
+  if (typeof ClipperLib === 'undefined'){ toast('The geometry library failed to load. Check your connection and reload.'); return; }
+  syncVisibility(); resize();
+  loadSample('island');
+})();
+</script>
