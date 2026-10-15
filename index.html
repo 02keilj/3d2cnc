@@ -9,7 +9,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 body{margin:0}
-
 /* Layout: fixed-width control rail on the left, full-height stage (3D / sheets / parts) on the right; stacks on phones. */
 :root{
   --bg:#e9ecea; --rail:#f6f7f6; --ink:#17201c; --muted:#5a6862; --line:#d0d7d3; --field:#ffffff;
@@ -31,7 +30,11 @@ body{margin:0}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45}
 *{box-sizing:border-box}
-.app{display:grid;grid-template-columns:330px minmax(0,1fr);height:100%}
+.app{display:grid;grid-template-columns:var(--railW,330px) minmax(0,1fr);height:100%;position:relative}
+.resizer{position:absolute;top:0;bottom:0;left:calc(var(--railW,330px) - 4px);width:8px;cursor:col-resize;z-index:6;touch-action:none}
+.resizer::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent;transition:background .15s}
+.resizer:hover::after,.resizer.drag::after,.resizer:focus-visible::after{background:var(--accent)}
+.resizer:focus-visible{outline:none}
 .rail{background:var(--rail);border-right:1px solid var(--line);overflow-y:auto;padding:18px 18px 28px;display:flex;flex-direction:column;gap:18px}
 .brand{display:flex;flex-direction:column;gap:2px}
 .brand h1{font-family:var(--display);font-weight:700;font-size:30px;letter-spacing:.01em;margin:0;line-height:1}
@@ -41,6 +44,12 @@ body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14p
 .brand p{margin:0;color:var(--muted);font-size:12.5px}
 section.grp{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px}
 section.grp>h2{margin:0;font-family:var(--display);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+section.grp.fold>h2{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;border-radius:4px}
+section.grp.fold>h2:hover{color:var(--ink)}
+section.grp.fold>h2:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+section.grp.fold>h2::after{content:"";width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
+section.grp.fold.closed>h2::after{transform:rotate(-45deg)}
+section.grp.fold.closed>:not(h2){display:none!important}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .f{display:flex;flex-direction:column;gap:4px;min-width:0}
@@ -95,6 +104,21 @@ section.grp>h2{margin:0;font-family:var(--display);font-weight:600;font-size:13p
 .sw{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;margin-right:4px;border:1px solid var(--ply-edge)}
 .busy{position:absolute;top:12px;right:12px;font:500 12px var(--mono);background:var(--rail);border:1px solid var(--line);padding:4px 8px;border-radius:6px}
 #vsheets{padding:16px;display:flex;flex-direction:column;gap:22px}
+.wsteps span{padding:8px 4px;font-size:13px;font-weight:600}
+.next{display:flex}
+.next .btn{flex:1}
+[data-step].offstep{display:none!important}
+.modes{margin-bottom:2px}
+.modes span{padding:9px 4px;font:600 13.5px var(--display);letter-spacing:.04em;text-transform:uppercase}
+.app.art .rail [data-step],.app.art .wsteps,.app.art .slicer-only{display:none!important}
+.app:not(.art) [data-art]{display:none!important}
+.app.art .bar,.app.art .views>.view:not(#vart){display:none!important}
+.app:not(.art) #vart{display:none!important}
+#vart{display:flex;align-items:center;justify-content:center;padding:24px;overflow:hidden}
+#artCv{max-width:100%;max-height:100%;border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+#artInfo{position:absolute;left:16px;bottom:14px;font:500 12px var(--mono);color:var(--muted);background:color-mix(in srgb,var(--rail) 88%,transparent);border:1px solid var(--line);border-radius:6px;padding:5px 9px}
+.empty{max-width:52ch;margin:40px auto;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:center}
+.empty b{color:var(--ink);font-family:var(--display);font-size:18px;letter-spacing:.02em}
 .sheet h3{margin:0 0 6px;font:600 14px var(--display);letter-spacing:.05em;text-transform:uppercase;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .sheet h3 small{font:400 12px var(--mono);color:var(--muted);text-transform:none;letter-spacing:0}
 .sheet .wrap{overflow-x:auto;border-radius:6px}
@@ -122,16 +146,16 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .sub{display:flex;flex-direction:column;gap:10px}
 @media (max-width:820px){
   .app{grid-template-columns:1fr;height:auto}
+  .resizer{display:none}
   .rail{border-right:0;border-bottom:1px solid var(--line)}
   .stage{height:78vh;min-height:460px}
   .stats{margin-left:0}
 }
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 </style>
-</head>
-<body>
 
-<div class="app">
+<div class="app" id="app">
+<div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Resize settings panel" tabindex="0"></div>
 <aside class="rail">
   <div class="brand"><div class="brandrow"><h1>3D<span>2</span>CNC</h1>
     <div class="seg theme" role="radiogroup" aria-label="Colour theme">
@@ -140,18 +164,32 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
       <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
     </div></div><p>Slice a 3D model into flat parts that slot together. Exports DXF and SVG per sheet.</p></div>
 
-  <section class="grp">
+  <div class="seg modes" role="radiogroup" aria-label="Tool">
+    <label><input type="radio" name="appmode" value="slicer" checked><span>Slicer</span></label>
+    <label><input type="radio" name="appmode" value="art"><span>Art generator</span></label>
+  </div>
+
+  <div class="seg wsteps" role="radiogroup" aria-label="Workflow step">
+    <label><input type="radio" name="wstep" value="design" checked><span>1 · Design</span></label>
+    <label><input type="radio" name="wstep" value="export"><span>2 · Export</span></label>
+  </div>
+
+  <section class="grp slicer-only">
     <h2>Project</h2>
-    <div class="btns"><button class="btn" id="saveProj" type="button">Save project</button><label class="btn" for="projFile">Load project</label></div>
+    <div class="btns"><button class="btn" id="saveProj" type="button">Save project</button><label class="btn" for="projFile">Load project</label><button class="btn" id="shareBtn" type="button">Share link</button></div>
     <input type="file" id="projFile" accept=".json,.3d2cnc" hidden>
     <p class="hint">Saves the model, every setting, body roles and panel edits in one file.</p>
+    <div id="sharePanel" hidden>
+      <div class="f"><span>Link to this project</span><div class="in"><input id="shareUrl" type="text" readonly><button class="btn" id="shareCopy" type="button" style="border:0;border-left:1px solid var(--line);border-radius:0">Copy</button></div></div>
+      <p class="hint" id="shareHint"></p>
+    </div>
   </section>
 
-  <section class="grp">
+  <section class="grp" data-step="design">
     <h2>Model</h2>
     <label class="drop" id="drop" for="file"><b>Load STL, OBJ or 3MF</b><br>or drop a file onto the viewer</label>
     <input type="file" id="file" accept=".stl,.obj,.3mf" hidden>
-    <div class="f"><span>Sample model</span><div class="in"><select id="sample"><option value="island">Volcanic island (terrain)</option><option value="pot">Pot with inset lid (radial + keep-out)</option><option value="blob">Organic blob</option><option value="vase">Turned vase</option></select></div></div>
+    <div class="f"><span>Sample model</span><div class="in"><select id="sample"><option value="island">Volcanic island (terrain)</option><option value="pot">Pot with inset lid (radial + keep-out)</option><option value="blob">Organic blob</option><option value="vase">Turned vase</option><option value="wave">Wave wall art (fins)</option></select></div></div>
     <div class="f"><span>Rotate model 90°</span><div class="btns"><button class="btn" data-rot="x" type="button">About X</button><button class="btn" data-rot="y" type="button">About Y</button><button class="btn" data-rot="z" type="button">About Z</button></div></div>
     <div class="row">
       <div class="f"><span>Scale</span><div class="in"><select id="fitAxis"><option value="file">File size (mm)</option><option value="0">Fit width X</option><option value="1">Fit depth Y</option><option value="2">Fit height Z</option></select></div></div>
@@ -160,7 +198,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
     <div class="dims" id="dims">–</div>
   </section>
 
-  <section class="grp">
+  <section class="grp" data-step="design">
     <h2>Bodies</h2>
     <div class="bodies" id="bodies"></div>
     <div class="f" id="keepRow"><span>Keep-out clearance</span><div class="in"><input id="keepClear" type="number" min="0" step="0.1" value="0.5"><i>mm</i></div></div>
@@ -170,7 +208,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
     </div>
   </section>
 
-  <section class="grp">
+  <section class="grp" data-step="design">
     <h2>Construction</h2>
     <div class="seg" role="radiogroup" aria-label="Method">
       <label><input type="radio" name="method" value="interlock" checked><span>Crate</span></label>
@@ -202,6 +240,13 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
       <p class="hint">Fins radiate around the vertical axis through the model's centre. Rotate the model to change the axis.</p>
     </div>
     <div class="f stk-only" hidden><span>Layer axis</span><div class="in"><select id="stackAxis"><option value="2">Layers ⟂ Z (horizontal)</option><option value="0">Layers ⟂ X</option><option value="1">Layers ⟂ Y</option></select></div></div>
+    <div class="row stk-only" hidden>
+      <div class="f"><span>Layer pattern</span><div class="in"><select id="stackGap"><option value="0" selected>Solid stack</option><option value="1">Fins, 1-layer gaps</option><option value="2">Fins, 2-layer gaps</option><option value="c">Fins, custom gap</option></select></div></div>
+      <div class="f gapc-only" hidden><span>Gap between fins</span><div class="in"><input id="stackGapMm" type="number" min="1" step="0.5" value="12"><i>mm</i></div></div>
+    </div>
+    <p class="hint fins-only" hidden>Spaced fins, like parametric wall art. 1-layer gaps drops every second layer. The fins thread onto the dowels with spacer washers in each gap, so dowels are always on and run through every fin.</p>
+    <label class="chk fins-only" hidden><input type="checkbox" id="washers" checked>Cut spacer washers from the same stock</label>
+    <div class="f fins-only washer-only" hidden><span>Washer outside diameter (0 = auto)</span><div class="in"><input id="washerD" type="number" min="0" step="1" value="0"><i>mm</i></div></div>
     <label class="chk join-only"><input type="checkbox" id="dropLoose" checked>Remove parts with no joints</label>
     <label class="chk join-only"><input type="checkbox" id="lighten">Lighten panels with cut-outs</label>
     <div class="row lighten-only" hidden>
@@ -215,15 +260,17 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
       <div class="f"><span>Solid top</span><div class="in"><input id="solidTop" type="number" min="0" step="1" value="1"><i>lyr</i></div></div>
     </div>
     <label class="chk stk-only" hidden><input type="checkbox" id="regLines">Engrave outline of the next layer</label>
-    <label class="chk stk-only" hidden><input type="checkbox" id="dowels">Alignment dowel holes</label>
+    <span class="nofins-only"><label class="chk stk-only" hidden><input type="checkbox" id="dowels">Alignment dowel holes</label></span>
     <div class="row dowel-only" hidden>
       <div class="f"><span>Dowel diameter</span><div class="in"><input id="dowelD" type="number" min="1" step="0.5" value="6"><i>mm</i></div></div>
-      <div class="f"><span>Per layer pair</span><div class="in"><input id="dowelN" type="number" min="1" max="4" step="1" value="2"><i>pcs</i></div></div>
+      <div class="f"><span>Holes per layer</span><div class="in"><input id="dowelN" type="number" min="1" max="3" step="1" value="2"><i>pcs</i></div></div>
     </div>
+    <span class="nofins-only"><label class="chk dowel-only" hidden><input type="checkbox" id="dowelHide" checked>Keep dowel ends hidden</label></span>
+    <p class="hint dowel-only" hidden>Dowels are long rods threaded through as many layers as possible, near the middle. Lengths are listed under Parts.</p>
     <div class="f"><span>Minimum part size (area of a square this wide)</span><div class="in"><input id="minSize" type="number" min="0" step="1" value="20"><i>mm</i></div></div>
   </section>
 
-  <section class="grp">
+  <section class="grp" data-step="design">
     <h2>Base and mounting</h2>
     <label class="chk join-only"><input type="checkbox" id="baseOn">Display base under the model</label>
     <div class="row base-only" hidden>
@@ -257,7 +304,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
     <div class="f plate-only" hidden><span>Tab length into base and back plate</span><div class="in"><input id="plateTab" type="number" min="4" step="1" value="20"><i>mm</i></div></div>
   </section>
 
-  <section class="grp">
+  <section class="grp" data-step="design">
     <h2>Material</h2>
     <div class="row">
       <div class="f"><span>Stock thickness</span><div class="in"><input id="thick" type="number" min="0.5" step="0.1" value="6"><i>mm</i></div></div>
@@ -272,7 +319,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
     <p class="hint fit-only" hidden>Cut the strip and the loose tab, find the slot that fits best and set that value as your slot clearance.</p>
   </section>
 
-  <section class="grp">
+  <section class="grp" data-step="design">
     <h2>Cutting</h2>
     <div class="seg" role="radiogroup" aria-label="Machine">
       <label><input type="radio" name="machine" value="cnc" checked><span>CNC router</span></label>
@@ -293,29 +340,92 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
     <p class="hint cnc-only">Parts are drawn at finished size. Set your CAM to cut outside the outline and inside holes.</p>
   </section>
 
-  <section class="grp">
-    <h2>Sheet layout</h2>
+  <div class="next" data-step="design"><button class="btn primary" id="toExport" type="button">Continue to export →</button></div>
+
+  <section class="grp" data-step="export">
+    <h2>Labels</h2>
+    <label class="chk"><input type="checkbox" id="labels" checked>Engrave part and slot labels</label>
+    <div class="f"><span>Label height</span><div class="in"><input id="labelH" type="number" min="1" step="0.5" value="4"><i>mm</i></div></div>
+    <p class="hint">Labels are single-stroke paths, ready for a V-bit or a laser line pass.</p>
+  </section>
+
+  <section class="grp" data-step="export">
+    <h2>Export</h2>
+    <div class="btns"><button class="btn primary" id="dlAllDxf" type="button">All parts DXF</button><button class="btn" id="dlAllSvg" type="button">All parts SVG</button></div>
+    <label class="chk"><input type="checkbox" id="groupParts" checked>Group each part in DXF (blocks)</label>
+    <p class="hint">Every part in one file, spaced out, for nesting in your CAM. DXF layers: CUT_OUTER, CUT_INNER, LABELS, ENGRAVE. Units are millimetres.</p>
+    <!-- Build guide is switched off while it is reworked; remove the hidden attributes to bring it back. -->
+    <div class="btns" hidden><button class="btn" id="dlGuide" type="button">Build guide PDF</button></div>
+    <p class="hint" hidden>A printable parts checklist and a picture for each assembly step, drawn from the current 3D view angle.</p>
+  </section>
+
+  <section class="grp" data-step="export">
+    <h2>Nesting</h2>
+    <p class="hint">Optional. Lays the parts out on your sheets by their real shapes, filling one sheet before starting the next.</p>
     <div class="row">
       <div class="f"><span>Sheet width</span><div class="in"><input id="sheetW" type="number" min="50" step="1" value="1220"><i>mm</i></div></div>
       <div class="f"><span>Sheet height</span><div class="in"><input id="sheetH" type="number" min="50" step="1" value="610"><i>mm</i></div></div>
       <div class="f"><span>Edge margin</span><div class="in"><input id="margin" type="number" min="0" step="1" value="10"><i>mm</i></div></div>
-      <div class="f"><span>Part spacing</span><div class="in"><input id="gap" type="number" min="0" step="0.5" value="8"><i>mm</i></div></div>
+      <div class="f"><span>Part spacing</span><div class="in"><input id="gap" type="number" min="0" step="0.5" value="9.5"><i>mm</i></div></div>
     </div>
-    <label class="chk"><input type="checkbox" id="labels" checked>Engrave part and slot labels</label>
+    <p class="hint" id="gapHint">Spacing follows 3 × bit diameter until you change it.</p>
     <div class="row">
-      <div class="f"><span>Label height</span><div class="in"><input id="labelH" type="number" min="1" step="0.5" value="4"><i>mm</i></div></div>
-      <label class="chk" style="align-self:end;padding-bottom:6px"><input type="checkbox" id="sheetLine">Sheet outline</label>
+      <div class="f"><span>Rotations</span><div class="in"><select id="nestRot"><option value="90">Every 90°</option><option value="45">Every 45°</option><option value="15">Every 15°</option><option value="5" selected>Every 5°</option><option value="2">Every 2° (slow)</option><option value="none">None</option></select></div></div>
+      <div class="f"><span>Accuracy</span><div class="in"><select id="nestRes"><option value="1">Fine (1 mm)</option><option value="2" selected>Normal (2 mm)</option><option value="3">Fast (3 mm)</option></select></div></div>
     </div>
-    <p class="hint">Labels are single-stroke paths, ready for a V-bit or a laser line pass.</p>
+    <div class="row">
+      <div class="f"><span>Method</span><div class="in"><select id="nestMethod"><option value="quick" selected>Quick (one pass)</option><option value="deep">Deep (keeps improving)</option></select></div></div>
+      <div class="f deep-only" id="nestTimeF"><span>Search for</span><div class="in"><select id="nestTime"><option value="30">30 s</option><option value="60" selected>1 min</option><option value="180">3 min</option><option value="600">10 min</option><option value="0">Until stopped</option></select></div></div>
+    </div>
+    <p class="hint deep-only" id="nestMethodHint">Deep works like Deepnest: it keeps trying new part orders and rotations and shows each better layout. Press Stop to keep the best so far.</p>
+    <div class="f"><span>Offcuts to use first</span><div class="in"><input id="offcuts" type="text" placeholder="e.g. 600x400, 900x300x2" autocomplete="off" spellcheck="false"></div></div>
+    <p class="hint">Width × height × count in mm, width in the same direction as the sheet width. Smallest are filled first.</p>
+    <div class="row">
+      <div class="f"><span>Grain</span><div class="in"><select id="grain"><option value="free" selected>Ignore</option><option value="along">Along parts</option><option value="across">Across parts</option></select></div></div>
+      <div class="f"><span>Keep the offcut</span><div class="in"><select id="nestKeep"><option value="length" selected>Full length</option><option value="width">Full width</option></select></div></div>
+    </div>
+    <p class="hint">Grain runs along the sheet's long side; with it on, parts only turn 0° or 180° so their long side follows (or crosses) it. Full length leaves a long strip of stock; full width a shorter, wider piece.</p>
+    <label class="chk"><input type="checkbox" id="nestHoles" checked>Place small parts inside holes</label>
+    <label class="chk"><input type="checkbox" id="nestSettle" checked>Settle parts on their exact outlines</label>
+    <label class="chk"><input type="checkbox" id="sheetLine">Include sheet outline</label>
+    <div class="btns"><button class="btn primary" id="runNest" type="button">Run nesting</button><button class="btn" id="dlZip" type="button" disabled>Sheets ZIP</button></div>
+    <p class="hint" id="nestStatus">Not nested yet.</p>
   </section>
 
-  <section class="grp">
-    <h2>Export</h2>
-    <div class="btns"><button class="btn primary" id="dlAllDxf" type="button">All parts DXF</button><button class="btn" id="dlAllSvg" type="button">All parts SVG</button><button class="btn" id="dlZip" type="button">Sheets ZIP</button></div>
-    <label class="chk"><input type="checkbox" id="groupParts" checked>Group each part in DXF (blocks)</label>
-    <p class="hint">All parts puts every part in one file, spaced out for nesting in your CAM. Sheets ZIP has one DXF and SVG per sheet plus a cut list. DXF layers: CUT_OUTER, CUT_INNER, LABELS, ENGRAVE. Units are millimetres. Untick blocks if your CAM can't read them.</p>
-  </section>
+  <div class="next" data-step="export"><button class="btn" id="toDesign" type="button">← Back to design</button></div>
 
+  <section class="grp" data-art>
+    <h2>Pattern</h2>
+    <p class="hint">Make a random relief panel for parametric fin wall art. Change any setting to update the preview; each seed gives a different design.</p>
+    <div class="f"><span>Pattern</span><div class="in"><select id="genType"><option value="ripples">Water droplets</option><option value="waves">Waves</option><option value="cloth">Cloth folds</option><option value="dunes">Sand dunes</option><option value="hills">Hills</option></select></div></div>
+    <div class="row">
+      <div class="f"><span>Features</span><div class="in"><input id="genDetail" type="number" min="1" max="12" step="1" value="5"></div></div>
+      <div class="f"><span>Seed</span><div class="in"><input id="genSeed" type="number" min="1" step="1" value="1"></div></div>
+    </div>
+    <div class="btns"><button class="btn" id="genPrevSeed" type="button">◀ Seed</button><button class="btn" id="genNextSeed" type="button">Seed ▶</button><button class="btn" id="genRand" type="button">Surprise me</button></div>
+  </section>
+  <section class="grp" data-art>
+    <h2>Panel</h2>
+    <div class="row">
+      <div class="f"><span>Width</span><div class="in"><input id="genW" type="number" min="100" max="3000" step="10" value="600"><i>mm</i></div></div>
+      <div class="f"><span>Height</span><div class="in"><input id="genH" type="number" min="100" max="3000" step="10" value="300"><i>mm</i></div></div>
+    </div>
+    <div class="row">
+      <div class="f"><span>Back depth</span><div class="in"><input id="genBase" type="number" min="5" step="1" value="15"><i>mm</i></div></div>
+      <div class="f"><span>Relief depth</span><div class="in"><input id="genDepth" type="number" min="5" step="1" value="40"><i>mm</i></div></div>
+    </div>
+    <p class="hint">Back depth is the solid strip behind the pattern where the dowels run; keep it at least twice the dowel size.</p>
+  </section>
+  <section class="grp" data-art>
+    <h2>Fins</h2>
+    <div class="row">
+      <div class="f"><span>Fins run</span><div class="in"><select id="genDir"><option value="0">Vertically</option><option value="1">Horizontally</option></select></div></div>
+      <div class="f"><span>Stock</span><div class="in"><input id="genThick" type="number" min="1" step="0.5" value="6"><i>mm</i></div></div>
+    </div>
+    <div class="f"><span>Gap between fins</span><div class="in"><select id="genGap"><option value="1">1 layer (every second)</option><option value="2">2 layers</option></select></div></div>
+    <label class="chk"><input type="checkbox" id="genShowFins" checked>Show fins on the preview</label>
+  </section>
+  <div class="next" data-art><button class="btn primary" id="genGo" type="button">Slice into fins →</button></div>
 </aside>
 
 <main class="stage">
@@ -333,6 +443,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
     </div>
   </div>
   <div class="views">
+    <div class="view" id="vart"><canvas id="artCv" width="900" height="450"></canvas><div id="artInfo"></div></div>
     <div class="view" id="v3d">
       <canvas id="cv"></canvas>
       <div class="busy" id="busy" hidden>Slicing…</div>
@@ -707,6 +818,7 @@ function splitPolys(paths){
 }
 
 function buildParts(model, o){
+  model.dowelsOut = null;
   var warnings = [], panels = [], joints = 0, openLoops = 0, skipped = 0, crossings = [], tol = 0.02, hubR = null;
   var sliceB = model.bodies.filter(function(b){ return b.role === 'slice'; });
   var koB = model.bodies.filter(function(b){ return b.role === 'keep' || b.role === 'keepcut'; });
@@ -837,9 +949,12 @@ function buildParts(model, o){
     tops = H; bots = Rf;
     refDir = function(P){ return P.F.eu; };
   } else {
-    var n = o.stackAxis, count = Math.max(1, Math.floor((mx[n]-mn[n])/t + 1e-6));
+    // Fins: layers with a gap between them (1 or 2 layers' worth, or a set distance), centred on the model.
+    var gapL = o.stackGap === '1' ? t : o.stackGap === '2' ? 2*t : o.stackGap === 'c' ? o.stackGapMm : 0, finMode = gapL > 0;
+    var n = o.stackAxis, span = mx[n]-mn[n], pitch = t + gapL, count = Math.max(1, Math.floor((span + gapL)/pitch + 1e-6));
     if (count > 400){ warnings.push('That would be ' + count + ' layers. Showing the first 400; use thicker stock or a smaller model.'); count = 400; }
-    for (var li=0;li<count;li++){ var lp = mn[n] + t*(li+0.5); makePanel('L', li, axisFrame(n, (n+1)%3, (n+2)%3, lp), 'XYZ'[n] + ' = ' + lp.toFixed(1)); }
+    var start = finMode ? mn[n] + Math.max(0, span - (count*t + (count - 1)*gapL))/2 : mn[n];
+    for (var li=0;li<count;li++){ var lp = start + pitch*li + t/2; makePanel('L', li, axisFrame(n, (n+1)%3, (n+2)%3, lp), 'XYZ'[n] + ' = ' + lp.toFixed(1)); }
     var L = panels.filter(function(P){ return P.fam === 'L'; });
     L.forEach(function(P, i){ P.nextL = L[i+1] || null; });
     var rr = cnc ? o.bit/2 + 0.5 : 0.5;
@@ -857,39 +972,91 @@ function buildParts(model, o){
         if (hole.length){ P.region = clipOp(P.region, hole, CL.ClipType.ctDifference); hollowed++; }
       });
     }
-    if (o.dowels && L.length > 1){
-      var dd = o.dowelD + o.clear, missing = [], prevPts = [];
-      for (var di=0; di<L.length-1; di++){
-        var a = L[di], b = L[di+1], pts = [];
-        if (a.region.length && b.region.length){
-          var shared = offsetPaths(clipOp(a.region, b.region, CL.ClipType.ctIntersection), -(dd/2 + 1.2));
-          // Candidate centres: points on the shrunk shared area, kept clear of the pins between the layers below.
-          var cand = [];
-          shared.forEach(function(path){ var step = Math.max(1, Math.floor(path.length/120)); for (var k=0;k<path.length;k+=step) cand.push([path[k].X/SC, path[k].Y/SC]); });
-          var rings = shared.map(fromPath);
-          cand = cand.filter(function(q){ return prevPts.every(function(pq){ return Math.hypot(q[0]-pq[0], q[1]-pq[1]) > dd + 3; }); });
-          if (cand.length){
-            var cx = cand.reduce(function(s,q){ return s+q[0]; }, 0)/cand.length, cy = cand.reduce(function(s,q){ return s+q[1]; }, 0)/cand.length;
-            if (o.dowelN === 1){ cand.sort(function(p1, p2){ return Math.hypot(p1[0]-cx, p1[1]-cy) - Math.hypot(p2[0]-cx, p2[1]-cy); }); pts.push(cand[0]); }
-            else {
-              var best = null;
-              for (var x1=0;x1<cand.length;x1++) for (var x2=x1+1;x2<cand.length;x2++){ var dist = Math.hypot(cand[x1][0]-cand[x2][0], cand[x1][1]-cand[x2][1]); if (!best || dist > best[0]) best = [dist, cand[x1], cand[x2]]; }
-              if (best && best[0] > dd + 3){ pts.push(best[1], best[2]); }
-              else pts.push(cand[0]);
-              while (pts.length < o.dowelN){
-                var far = null;
-                cand.forEach(function(q){ var md = Math.min.apply(null, pts.map(function(pq){ return Math.hypot(q[0]-pq[0], q[1]-pq[1]); })); if (!far || md > far[0]) far = [md, q]; });
-                if (!far || far[0] < dd + 3) break; pts.push(far[1]);
-              }
-            }
+    if ((o.dowels || finMode) && L.length > 1){
+      // Long through-dowels. Map every grid point: which layers it lies inside (silhouette, hollows included) and which
+      // it can be drilled through (solid material with clearance). A dowel runs through a contiguous stack of layers
+      // at one point. Greedily pick the dowel that drills the most layers still needing holes, nearest the middle,
+      // until every drillable layer has its target count. Hidden ends stop a layer short of any exposed face.
+      var dd = o.dowelD + o.clear, Lc = L.length, target = o.dowelN;
+      var Vp = L.map(function(P){ return P.region.length ? offsetPaths(P.region, -(dd/2 + 1.2)) : []; });
+      var Sp = L.map(function(P){ var outers = P.region.filter(function(pth){ return CL.Clipper.Orientation(pth); }); return outers.length ? offsetPaths(clipOp(outers, null, CL.ClipType.ctUnion), -(dd/2 + 0.5)) : []; });
+      var allB = pathsBox([].concat.apply([], L.map(function(P){ return P.region; })));
+      var gW = allB[2] - allB[0], gH = allB[3] - allB[1], step = Math.max(1.5, Math.max(gW, gH)/90);
+      var cols = Math.max(1, Math.floor(gW/step)), rows = Math.max(1, Math.floor(gH/step)), NC = cols*rows;
+      var cx0 = allB[0] + (gW - (cols-1)*step)/2, cy0 = allB[1] + (gH - (rows-1)*step)/2;
+      var swapP = function(paths){ return paths.map(function(pth){ return pth.map(function(q){ return { X: q.Y, Y: q.X }; }); }); };
+      var raster = function(paths){
+        var m = new Uint8Array(NC); if (!paths.length) return m; var sw = swapP(paths);
+        for (var r=0; r<rows; r++){ var y = cy0 + r*step; intervals(sw, y).forEach(function(iv){ var c0 = Math.max(0, Math.ceil((iv[0] - cx0)/step)), c1 = Math.min(cols-1, Math.floor((iv[1] - cx0)/step)); for (var c=c0; c<=c1; c++) m[r*cols + c] = 1; }); }
+        return m;
+      };
+      var Vm = Vp.map(raster), Sm = Sp.map(raster);
+      var runs = [], cnt = 0, sx = 0, sy = 0, drillable = new Array(Lc).fill(false);
+      for (var cell=0; cell<NC; cell++){
+        var px = cx0 + (cell % cols)*step, py = cy0 + Math.floor(cell/cols)*step, li = 0, cr = [];
+        while (li < Lc){
+          if (!Sm[li][cell]){ li++; continue; }
+          var ra = li; while (li < Lc && Sm[li][cell]) li++; var rb = li - 1;
+          cnt += rb - ra + 1; sx += px*(rb - ra + 1); sy += py*(rb - ra + 1);
+          var lo = ra, hi = rb;
+          if (o.dowelHide && !finMode){ hi = rb - 1; if (ra > 0) lo = ra + 1; }
+          var idx = []; for (var j=lo; j<=hi; j++) if (Vm[j][cell]) idx.push(j);
+          if (idx.length){ cr.push(idx); idx.forEach(function(j){ drillable[j] = true; }); }
+        }
+        runs.push(cr);
+      }
+      var mcx = cnt ? sx/cnt : (allB[0] + allB[2])/2, mcy = cnt ? sy/cnt : (allB[1] + allB[3])/2;
+      var dims = L.filter(function(P){ return P.region.length; }).map(function(P){ var b = pathsBox(P.region); return Math.min(b[2]-b[0], b[3]-b[1]); }).sort(function(x, y){ return x - y; });
+      // Dowels sharing layers must be far enough apart to stop the layers rotating: 20% of a typical layer's width.
+      var need = drillable.map(function(d){ return d ? target : 0; }), chosen = [], minSp = Math.max(3*dd, 15, 0.2*(dims[Math.floor(dims.length/2)] || 0));
+      for (var it=0; it<60 && need.some(function(v){ return v > 0; }); it++){
+        var best = null;
+        for (var c2=0; c2<NC; c2++){
+          var rs = runs[c2]; if (!rs.length) continue;
+          var qx = cx0 + (c2 % cols)*step, qy = cy0 + Math.floor(c2/cols)*step, dc = Math.hypot(qx - mcx, qy - mcy);
+          for (var k=0; k<rs.length; k++){
+            var idxs = rs[k], gain = 0;
+            for (var q=0; q<idxs.length; q++) if (need[idxs[q]] > 0) gain++;
+            if (!gain) continue;
+            var a0 = idxs[0], a1 = idxs[idxs.length-1];
+            if (chosen.some(function(d){ return d.a1 >= a0 && d.a0 <= a1 && Math.hypot(d.x - qx, d.y - qy) < minSp; })) continue;
+            var score = gain*1e6 + idxs.length*1e3 - dc;
+            if (!best || score > best.score) best = { score: score, x: qx, y: qy, idx: idxs, a0: a0, a1: a1 };
           }
         }
-        if (!pts.length) missing.push(a.name + '/' + b.name);
-        pts.forEach(function(q){ var h = circleUV(q[0], q[1], dd/2); a.cuts.push(h); b.cuts.push(h); });
-        prevPts = pts;
+        if (!best) break;
+        best.idx.forEach(function(j){ need[j]--; });
+        chosen.push(best);
       }
-      if (missing.length && o.hollow && o.wall < dd + 2.4) warnings.push('Walls of ' + o.wall + ' mm are too thin for ' + o.dowelD + ' mm dowels. Use walls of at least ' + Math.ceil(dd + 3) + ' mm or smaller dowels.');
-      else if (missing.length) warnings.push('No room for alignment dowels between ' + missing.slice(0, 6).join(', ') + (missing.length > 6 ? ' and ' + (missing.length-6) + ' more' : '') + '.');
+      var dowelList = chosen.map(function(d, k){
+        d.idx.forEach(function(j){ L[j].cuts.push(posPath(circleUV(d.x, d.y, dd/2))); });
+        var F0 = L[d.a0].F, F1 = L[d.a1].F, base = add(F0.O, add(scl(F0.eu, d.x), scl(F0.ev, d.y)));
+        var z0 = dot(F0.O, F0.en) - t/2, z1 = dot(F1.O, F1.en) + t/2;
+        return { name: 'D' + (k+1), x: d.x, y: d.y, from: L[d.a0].name, to: L[d.a1].name, drilled: d.idx.length, len: z1 - z0,
+          p0: add(base, scl(F0.en, -t/2)), p1: add(base, scl(F0.en, z1 - z0 - t/2)), dia: o.dowelD };
+      });
+      model.dowelsOut = dowelList;
+      // Spacer washers fill each gap a dowel crosses, stacked from the same stock (a gap of two layers takes two).
+      if (finMode && o.washers){
+        var nW = Math.max(1, Math.round(gapL/t)), od = o.washerD > dd + 2 ? o.washerD : dd + 2*Math.max(3, 0.6*dd), wk = 0;
+        if (Math.abs(nW*t - gapL) > 0.25) warnings.push('The ' + gapL + ' mm gap is not a whole number of ' + t + ' mm layers, so ' + nW + ' washer' + (nW > 1 ? 's' : '') + ' per gap will leave it ' + (nW*t > gapL ? 'wider' : 'narrower') + ' by ' + Math.abs(nW*t - gapL).toFixed(1) + ' mm. Use a gap of ' + (nW*t) + ' mm or tube spacers cut to length.');
+        chosen.forEach(function(d, k){
+          for (var j=d.a0; j<d.a1; j++){
+            for (var q=0; q<nW; q++){
+              var Fw = shiftF(L[j].F, t/2 + (gapL - nW*t)/2 + t*(q + 0.5));
+              panels.push({ fam: 'W', name: 'W' + (++wk), F: Fw, planeLabel: 'Spacer on ' + dowelList[k].name, region: [posPath(circleUV(d.x, d.y, od/2, 48))],
+                cuts: [posPath(circleUV(d.x, d.y, dd/2))], fixedCuts: [], labels: [], slots: [], noJoin: true, keepSmall: true, noLabel: true });
+            }
+          }
+        });
+      }
+      var short = L.filter(function(P, j){ return drillable[j] && need[j] > 0; }).map(function(P){ return P.name; });
+      var undrill = L.filter(function(P, j){ return !drillable[j] && P.region.length; }).map(function(P){ return P.name; });
+      var listNames = function(a){ return a.slice(0, 8).join(', ') + (a.length > 8 ? ' and ' + (a.length - 8) + ' more' : ''); };
+      if (short.length) warnings.push('Only one dowel could be fitted through ' + listNames(short) + '.');
+      if (undrill.length) warnings.push(o.hollow && o.wall < dd + 2.4 ? 'Walls of ' + o.wall + ' mm are too thin for ' + o.dowelD + ' mm dowels; use walls of at least ' + Math.ceil(dd + 3) + ' mm or thinner dowels.'
+        : finMode ? listNames(undrill) + (undrill.length > 1 ? ' have' : ' has') + ' no room for a dowel, so ' + (undrill.length > 1 ? 'they' : 'it') + ' would not be held. Use thinner dowels, a different layer axis or a larger model.'
+        : (o.dowelHide ? listNames(undrill) + (undrill.length > 1 ? ' are' : ' is') + ' not drilled, so the dowel ends stay hidden. Line ' + (undrill.length > 1 ? 'these' : 'it') + ' up by the engraved outline, or turn off hidden dowel ends.' : 'No dowel can reach ' + listNames(undrill) + '.'));
     }
   }
   bots.forEach(function(P){ P.liftDir = refDir(P); });
@@ -1186,7 +1353,7 @@ function buildParts(model, o){
       var it = { outer: outer, holes: holes, bbox: ringsBox(outer), area: Math.abs(areaOf(outer)) - holes.reduce(function(s,h){ return s + Math.abs(areaOf(h)); }, 0) };
       var rg = [outer].concat(holes);
       it.joints = P.slots.filter(function(sp){ return pip(sp, rg); }).length;
-      if (it.area < minArea){ it.why = 'small'; gone.push(it); }
+      if (it.area < minArea && !P.keepSmall){ it.why = 'small'; gone.push(it); }
       else if (o.method !== 'stack' && o.dropLoose && !P.noJoin && !it.joints){ it.why = 'loose'; gone.push(it); }
       else kept.push(it);
     });
@@ -1252,7 +1419,7 @@ function buildParts(model, o){
     isl.forEach(function(e, k){
       var name = P.name + (isl.length > 1 ? String.fromCharCode(97+k) : '');
       var rings = [e.outer].concat(e.holes), labels = [];
-      if (o.labels){
+      if (o.labels && !P.noLabel){
         var slotLabs = P.labels.filter(function(L){ return L.check.every(function(q){ return pip(q, rings); }); });
         var boxes = slotLabs.map(function(L){ return ringsBox(L.check); });
         var nameSize = Math.min(o.labelH*1.5, Math.max(1.5, (e.bbox[3]-e.bbox[1])*0.35));
@@ -1305,7 +1472,7 @@ function buildParts(model, o){
   if (skipped) warnings.push(skipped + ' crossing' + (skipped>1?'s':'') + ' too close to an edge to hold a joint ' + (skipped>1?'were':'was') + ' notched on one side only.');
   if (loose) warnings.push(loose + ' part' + (loose>1?'s':'') + ' with no joints ' + (loose>1?'were':'was') + ' removed. Add more panels if you want them kept.');
   if (dropped) warnings.push(dropped + ' small piece' + (dropped>1?'s were':' was') + ' under the minimum part size (' + minArea.toFixed(0) + ' mm²) and left out.');
-  return { parts: parts, joints: joints, warnings: warnings, panels: panels, hub: hubR, collisions: collisions, baseCounts: baseCounts, dupGroups: dupGroups, half: half };
+  return { parts: parts, joints: joints, warnings: warnings, panels: panels, hub: hubR, collisions: collisions, dowels: model.dowelsOut || [], baseCounts: baseCounts, dupGroups: dupGroups, half: half };
 }
 
 // A comb of slots stepping through clearances, each labelled, plus a loose tab to try in them.
@@ -1393,6 +1560,317 @@ function ringWithGaps(ring, rt, tw){
 }
 function tabMarker(t, tw, across){ var h = across/2, d = t.d, n = t.n, q = t.q; return [[-tw/2,-h],[tw/2,-h],[tw/2,h],[-tw/2,h]].map(function(c){ return [q[0] + d[0]*c[0] + n[0]*c[1], q[1] + d[1]*c[0] + n[1]*c[1]]; }); }
 
+// A part mapped onto a sheet by f (part coords -> sheet coords), with its labels turned by extraDeg.
+function placeWith(p, f, extraDeg){
+  var outer = p.outer.map(f), holes = p.holes.map(function(h){ return h.map(f); });
+  return { part: p, outer: outer, holes: holes, tabs: [],
+    cutGeo: [{ pts: outer, closed: true, layer: 'CUT_OUTER' }].concat(holes.map(function(h){ return { pts: h, closed: true, layer: 'CUT_INNER' }; })),
+    engrave: (p.engrave || []).map(function(l){ return l.map(f); }),
+    labels: p.labels.map(function(L){
+      var q = f([L.u, L.v]), ang = (L.angle || 0) + extraDeg;
+      while (ang > 90.01) ang -= 180; while (ang <= -89.99) ang += 180;
+      return { main: L.main, lines: textStrokes(L.text, q[0], q[1], L.size, ang) };
+    }) };
+}
+
+// ---------- grid nesting ----------
+// Self-contained (runs in a Web Worker): packs rasterised parts onto sheets, biggest first. Each part goes where its top
+// edge stays lowest on the earliest sheet with room: offcuts (job.stock) first, then as many full sheets as needed.
+// Free cells inside holes are used like any other space, and are tried first.
+function gridPack(job, progress, gene){
+  var B = job.border, stock = job.stock || [], sheets = [], out = [];
+  function newSheet(W, H){
+    var occ = new Uint8Array(W*H), R = new Int32Array(W*H);
+    for (var y=0;y<H;y++) for (var x=0;x<W;x++) if (x < B || y < B || x >= W - B || y >= H - B) occ[y*W + x] = 1;
+    var sh = { W: W, H: H, occ: occ, R: R, holes: [] }; for (var r=0;r<H;r++) rowRuns(sh, r); return sh;
+  }
+  function rowRuns(sh, y){ var W = sh.W, run = 0, o = y*W; for (var x=W-1;x>=0;x--){ run = sh.occ[o + x] ? 0 : run + 1; sh.R[o + x] = run; } }
+  function fits(sh, rot, X, Y){
+    var rows = rot.rows, W = sh.W;
+    for (var k=0;k<rows.length;k++){ var r = rows[k], len = r[2] - r[1] + 1, free = sh.R[(Y + r[0])*W + X + r[1]]; if (free < len) return free + 1; }
+    return -1;
+  }
+  function scan(sh, rot, x0, y0, x1, y1){
+    for (var Y=y0; Y + rot.h <= y1; Y++){ var X = x0; while (X + rot.w <= x1){ var sk = fits(sh, rot, X, Y); if (sk < 0) return { X: X, Y: Y }; X += sk; } }
+    return null;
+  }
+  // A gene can pin an item to one rotation; otherwise every distinct rotation is tried.
+  function allowed(item, ri){ var g = item.pin; return g == null || g < 0 ? !item.rots[ri].dup : ri === g; }
+  function bestOn(sh, item){
+    var W = sh.W, H = sh.H;
+    // Holes in parts already on the sheet come first, so small parts fill them instead of new space.
+    for (var hi=0; hi<sh.holes.length; hi++){ var hr = sh.holes[hi];
+      for (var r0=0; r0<item.rots.length; r0++){ var rr = item.rots[r0]; if (!allowed(item, r0) || rr.w > hr[2] - hr[0] || rr.h > hr[3] - hr[1]) continue;
+        var hit = scan(sh, rr, hr[0], hr[1], hr[2], hr[3]); if (hit) return { rot: r0, X: hit.X, Y: hit.Y }; } }
+    // Lowest top edge wins (then leftmost), so long parts lie down and the free space stays one strip at the top.
+    var best = null;
+    for (var ri=0; ri<item.rots.length; ri++){
+      var rot = item.rots[ri]; if (!allowed(item, ri) || rot.w > W - 2*B || rot.h > H - 2*B) continue;
+      for (var Y=0; Y + rot.h <= H; Y++){
+        if (best && (Y + rot.h > best.T || (Y + rot.h === best.T && best.X === 0))) break;
+        var X = 0;
+        while (X + rot.w <= W){ var sk = fits(sh, rot, X, Y); if (sk < 0){ var T = Y + rot.h; if (!best || T < best.T || (T === best.T && X < best.X)) best = { rot: ri, X: X, Y: Y, T: T }; break; } X += sk; }
+      }
+    }
+    return best;
+  }
+  function mark(sh, rot, X, Y){
+    var W = sh.W, H = sh.H, touched = {};
+    rot.rows.forEach(function(r){ var y = Y + r[0], o = y*W; for (var x=X + r[1]; x<=X + r[2]; x++) sh.occ[o + x] = 1; touched[y] = 1; });
+    Object.keys(touched).forEach(function(y){ rowRuns(sh, +y); });
+    (rot.holes || []).forEach(function(h){ sh.holes.push([Math.max(0, X + h[0]), Math.max(0, Y + h[1]), Math.min(W, X + h[2] + 1), Math.min(H, Y + h[3] + 1)]); });
+    sh.holes.sort(function(a, b){ return a[1] - b[1] || a[0] - b[0]; });
+  }
+  stock.forEach(function(s){ sheets.push(newSheet(s.W, s.H)); });
+  var order = gene ? gene.order : null;
+  for (var n=0;n<job.items.length;n++){
+    var i = order ? order[n] : n, item = job.items[i], placed = null;
+    item.pin = gene ? gene.rot[i] : null;
+    for (var si=0; si<=sheets.length && !placed; si++){
+      var fresh = si === sheets.length, sh = fresh ? newSheet(job.W, job.H) : sheets[si];
+      if (fresh) sheets.push(sh);
+      var b = bestOn(sh, item);
+      if (b){ mark(sh, item.rots[b.rot], b.X, b.Y); placed = { sheet: si, rot: b.rot, X: b.X, Y: b.Y }; }
+      else if (fresh){ sheets.pop(); break; }
+    }
+    out[i] = placed || { oversize: true };
+    if (progress) progress((n + 1)/job.items.length);
+  }
+  return out;
+}
+// Deepnest-style search: a genetic algorithm over the order parts are placed in and the rotation each one is held to,
+// scored by full sheets used, then by the area of the box around the parts on them. Self-contained (runs in a Worker,
+// calls gridPack). Reports each better layout; stops at the time limit (0 = never).
+function deepNest(job, seconds, report){
+  var n = job.items.length, cells = job.W*job.H, nStock = (job.stock || []).length, pop = [], end = seconds > 0 ? Date.now() + seconds*1000 : Infinity, evals = 0, gen = 0, best = null;
+  function fitness(out){
+    var bb = {}, oversize = 0;
+    out.forEach(function(pl, i){
+      if (pl.oversize){ oversize++; return; }
+      var r = job.items[i].rots[pl.rot], b = bb[pl.sheet] || (bb[pl.sheet] = [1e9, 1e9, -1, -1]);
+      b[0] = Math.min(b[0], pl.X); b[1] = Math.min(b[1], pl.Y); b[2] = Math.max(b[2], pl.X + r.w); b[3] = Math.max(b[3], pl.Y + r.h);
+    });
+    // Offcuts are free to use, so only full sheets count; then a smaller last sheet (which is what eventually frees a
+    // whole sheet); then tighter full sheets; then tighter offcuts.
+    var ks = Object.keys(bb).map(Number).sort(function(a, b){ return a - b; }), fullK = ks.filter(function(k){ return k >= nStock; }), f = fullK.length + oversize;
+    ks.forEach(function(k){
+      var b = bb[k], st = k < nStock ? job.stock[k] : null, fr = (b[2] - b[0])*(b[3] - b[1])/(st ? st.W*st.H : cells);
+      f += st ? 0.05*fr : (k === fullK[fullK.length - 1] ? 0.6 : 0.3)*fr;
+    });
+    return f;
+  }
+  function rotsOf(i){ var a = []; job.items[i].rots.forEach(function(r, k){ if (!r.dup) a.push(k); }); return a; }
+  var choices = job.items.map(function(it, i){ return rotsOf(i); });
+  function evaluate(ind){
+    var out = gridPack(job, null, ind); ind.out = out; ind.fit = fitness(out); evals++;
+    if (!best || ind.fit < best.fit - 1e-9){ best = ind; report({ best: out, fit: ind.fit, gen: gen, evals: evals }); }
+    else report({ tick: true, gen: gen, evals: evals });
+    return ind;
+  }
+  // The rotation a part actually got: pinned, or whatever the packer picked when it was free to choose.
+  // Pinning to it keeps a layout while making later evaluations much faster.
+  function actual(ind, i){ if (ind.rot[i] >= 0) return ind.rot[i]; var pl = ind.out && ind.out[i]; return pl && !pl.oversize ? pl.rot : -1; }
+  function nudge(i, cur){
+    var c = choices[i], x = Math.random();
+    if (c.length < 2) return c.length ? c[0] : -1;
+    if (x < 0.15 || cur < 0) return x < 0.3 ? -1 : c[Math.floor(Math.random()*c.length)];
+    var k = c.indexOf(cur), d = (1 + Math.floor(Math.random()*3))*(Math.random() < 0.5 ? -1 : 1);
+    if (x > 0.85) d = Math.round(c.length/2);
+    return c[((k + d) % c.length + c.length) % c.length];
+  }
+  function mutate(ind, rate){
+    var o = ind.order.slice(), r = ind.order.map(function(){ return 0; });
+    ind.order.forEach(function(i){ r[i] = actual(ind, i); });
+    for (var p=0;p<n;p++){
+      if (Math.random() < rate){ var q = Math.random() < 0.6 ? Math.min(n - 1, p + 1) : Math.floor(Math.random()*n), t = o[p]; o[p] = o[q]; o[q] = t; }
+      if (Math.random() < rate) r[o[p]] = nudge(o[p], r[o[p]]);
+    }
+    return { order: o, rot: r };
+  }
+  function cross(a, b){
+    var cut = Math.floor(Math.random()*(n - 1)) + 1, o = a.order.slice(0, cut), seen = {};
+    o.forEach(function(x){ seen[x] = 1; }); b.order.forEach(function(x){ if (!seen[x]) o.push(x); });
+    var r = []; for (var k=0; k<n; k++) r[o[k]] = k < cut ? actual(a, o[k]) : actual(b, o[k]);
+    return { order: o, rot: r, out: null };
+  }
+  function pick(exclude){
+    // Rank-weighted: the best individuals are the most likely parents.
+    var tot = pop.length*(pop.length + 1)/2, x = Math.random()*tot;
+    for (var i=0;i<pop.length;i++){ x -= pop.length - i; if (x <= 0 && pop[i] !== exclude) return pop[i]; }
+    return pop[0] === exclude ? pop[pop.length - 1] : pop[0];
+  }
+  var seed = { order: job.items.map(function(_, i){ return i; }), rot: job.items.map(function(){ return -1; }) };
+  pop.push(evaluate(seed));
+  if (n < 2) return best;
+  pop.push(evaluate({ order: seed.order.slice(), rot: seed.order.map(function(i){ return actual(seed, i); }) }));
+  var size = Math.max(6, Math.min(12, n));
+  while (pop.length < size && Date.now() < end) pop.push(evaluate(mutate(seed, 0.3)));
+  while (Date.now() < end){
+    gen++;
+    pop.sort(function(a, b){ return a.fit - b.fit; });
+    var next = [pop[0]];
+    while (next.length < size && Date.now() < end){
+      var m = pick(null), f = pick(m);
+      next.push(evaluate(mutate(cross(m, f), 0.1)));
+    }
+    pop = next;
+  }
+  return best;
+}
+// Douglas-Peucker on a closed ring (tolerance in mm).
+function rdpRing(r, tol){
+  if (r.length < 8) return r.slice();
+  var far = 0, fd = -1; r.forEach(function(p, i){ var d = Math.hypot(p[0] - r[0][0], p[1] - r[0][1]); if (d > fd){ fd = d; far = i; } });
+  function rdp(pts){
+    if (pts.length < 3) return pts;
+    var a = pts[0], b = pts[pts.length - 1], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1e-9, mi = 0, md = -1;
+    for (var i=1;i<pts.length-1;i++){ var d = Math.abs((pts[i][0] - a[0])*dy - (pts[i][1] - a[1])*dx)/L; if (d > md){ md = d; mi = i; } }
+    if (md <= tol) return [a, b];
+    var l = rdp(pts.slice(0, mi + 1)), rr = rdp(pts.slice(mi));
+    return l.slice(0, -1).concat(rr);
+  }
+  var h1 = rdp(r.slice(0, far + 1)), h2 = rdp(r.slice(far).concat([r[0]]));
+  return h1.slice(0, -1).concat(h2.slice(0, -1));
+}
+// Offcut list from text such as "600x400, 900 x 300 x 2" (width × height × count, mm).
+function parseOffcuts(txt){
+  var out = [];
+  String(txt || '').split(/[,;\n]+/).forEach(function(s){
+    var m = s.match(/(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)(?:\s*[x×*]\s*(\d+))?/i); if (!m) return;
+    var w = +m[1], h = +m[2], n = Math.min(50, Math.max(1, +(m[3] || 1)));
+    if (w >= 20 && h >= 20) out.push({ w: w, h: h, n: n });
+  });
+  return out;
+}
+// Rasterise each part (grown by half the spacing, holes optional) at every allowed rotation.
+function prepNest(parts, o){
+  var res = o.nestRes, gap = o.gap, grow = gap/2 + res*0.75, tol = 0.15;
+  var step = o.nestRot === 'none' ? 360 : +o.nestRot || 90, angles = [];
+  for (var a=0; a<360; a+=step) angles.push(a);
+  // The packer fills upwards and keeps a full-width strip free; turn the sheet 90° when that strip should run the other way.
+  var turn = (o.nestKeep === 'width') === (o.sheetW >= o.sheetH), SW = turn ? o.sheetH : o.sheetW, SH = turn ? o.sheetW : o.sheetH;
+  var W = Math.floor(SW/res), H = Math.floor(SH/res), border = Math.ceil(Math.max(0, o.margin - gap/2)/res);
+  // Grain runs along the sheet's long side. In the packing frame that is x unless the sheet was turned.
+  var grainX = (o.sheetW >= o.sheetH) !== turn; if (o.grain === 'across') grainX = !grainX;
+  // Offcuts are entered with width along the full sheet's width (same grain), and used smallest first.
+  var stock = [];
+  (o.offcuts || []).forEach(function(s){ for (var k=0;k<s.n;k++) stock.push({ w: s.w, h: s.h }); });
+  stock.sort(function(a, b){ return a.w*a.h - b.w*b.h; });
+  var metas = parts.map(function(p, idx){
+    var rings = [posPath(toPath(p.outer))].concat(o.nestHoles ? p.holes.map(function(h){ var q = toPath(h); if (CL.Clipper.Orientation(q)) q.reverse(); return q; }) : []);
+    var grown = offsetPaths(rings, grow);
+    // Exact outline for settling: grown a hair more than half the spacing, then simplified within that hair.
+    var exact = offsetPaths(rings, gap/2 + tol).map(function(pth){ return rdpRing(fromPath(pth), tol); });
+    var angs = angles;
+    if (o.grain === 'along' || o.grain === 'across'){
+      var pb = p.bbox, longX = (pb[2] - pb[0]) >= (pb[3] - pb[1]), a0 = longX === grainX ? 0 : 90;
+      angs = [a0, a0 + 180];
+    }
+    var rots = angs.map(function(deg){
+      var c = Math.cos(deg*Math.PI/180), sn = Math.sin(deg*Math.PI/180);
+      var rp = grown.map(function(path){ return path.map(function(q){ var x = q.X/SC, y = q.Y/SC; return { X: Math.round((c*x - sn*y)*SC), Y: Math.round((sn*x + c*y)*SC) }; }); });
+      var bb = pathsBox(rp), w = Math.max(1, Math.ceil((bb[2] - bb[0])/res) + 1), h = Math.max(1, Math.ceil((bb[3] - bb[1])/res) + 1);
+      var sw = rp.map(function(path){ return path.map(function(q){ return { X: q.Y, Y: q.X }; }); }), rows = [];
+      for (var j=0;j<h;j++){ var y = bb[1] + (j + 0.5)*res; intervals(sw, y).forEach(function(iv){ var c0 = Math.max(0, Math.floor((iv[0] - bb[0])/res)), c1 = Math.min(w - 1, Math.floor((iv[1] - bb[0])/res)); if (c1 >= c0) rows.push([j, c0, c1]); }); }
+      // Holes big enough to take another part, as cell rectangles relative to this raster.
+      var holes = [];
+      if (o.nestHoles) p.holes.forEach(function(hl){
+        if (Math.abs(areaOf(hl)) < 400) return;
+        var hp = hl.map(function(q){ return [c*q[0] - sn*q[1], sn*q[0] + c*q[1]]; }), hb = ringsBox(hp);
+        holes.push([Math.floor((hb[0] - bb[0])/res), Math.floor((hb[1] - bb[1])/res), Math.ceil((hb[2] - bb[0])/res), Math.ceil((hb[3] - bb[1])/res)]);
+      });
+      return { deg: deg, ox: bb[0], oy: bb[1], w: w, h: h, rows: rows, holes: holes, key: w + 'x' + h + ':' + rows.join(';') };
+    });
+    var seen = {}; rots.forEach(function(r){ if (seen[r.key]) r.dup = true; seen[r.key] = 1; delete r.key; });
+    return { idx: idx, area: Math.abs(areaOf(p.outer)), rots: rots, exact: exact };
+  });
+  metas.sort(function(a, b){ return b.area - a.area; });
+  var jobStock = stock.map(function(s){ return { W: Math.floor((turn ? s.h : s.w)/res), H: Math.floor((turn ? s.w : s.h)/res) }; });
+  return { res: res, turn: turn, SW: SW, stock: stock, edge: Math.max(0, o.margin - gap/2 - tol), metas: metas,
+    job: { W: W, H: H, border: border, stock: jobStock, items: metas.map(function(m){ return { rots: m.rots.map(function(r){ return { w: r.w, h: r.h, rows: r.rows, holes: r.holes, dup: !!r.dup }; }) }; }) } };
+}
+// Exact-outline settling: slide each placed part straight down, then left, until its outline (grown by half the
+// spacing) touches a neighbour or the margin. Removes the grid's rounding slack without ever creating an overlap.
+function settleParts(prep, out){
+  var bySheet = {};
+  out.forEach(function(pl, k){
+    if (pl.oversize) return;
+    var meta = prep.metas[k], r = meta.rots[pl.rot], c = Math.cos(r.deg*Math.PI/180), sn = Math.sin(r.deg*Math.PI/180);
+    pl.tx = pl.X*prep.res - r.ox; pl.ty = pl.Y*prep.res - r.oy;
+    var rings = meta.exact.map(function(ring){ return ring.map(function(q){ return [c*q[0] - sn*q[1] + pl.tx, sn*q[0] + c*q[1] + pl.ty]; }); });
+    (bySheet[pl.sheet] = bySheet[pl.sheet] || []).push({ pl: pl, rings: rings, bb: ringsBox([].concat.apply([], rings)) });
+  });
+  // Distance P can move towards -axis before a vertex of one outline meets an edge of the other.
+  function rays(V, E, a, d, sgn){
+    var b = 1 - a;
+    for (var i=0;i<V.length;i++){ var vr = V[i];
+      for (var j=0;j<vr.length;j++){ var v = vr[j];
+        for (var k=0;k<E.length;k++){ var er = E[k], m = er.length;
+          for (var e=0;e<m;e++){ var p = er[e], q = er[(e + 1) % m], lo = p[b] < q[b] ? p[b] : q[b], hi = p[b] < q[b] ? q[b] : p[b];
+            if (v[b] < lo || v[b] >= hi) continue;
+            var at = p[a] + (v[b] - p[b])/(q[b] - p[b])*(q[a] - p[a]), dist = sgn > 0 ? v[a] - at : at - v[a];
+            if (dist > -0.01 && dist < d) d = dist < 0 ? 0 : dist;
+          } } } }
+    return d;
+  }
+  function slide(P, Q, a, d){
+    var b = 1 - a, pb = P.bb, qb = Q.bb;
+    if (qb[b + 2] <= pb[b] || qb[b] >= pb[b + 2] || qb[a] >= pb[a + 2] || qb[a + 2] <= pb[a] - d) return d;
+    d = rays(P.rings, Q.rings, a, d, 1);
+    return rays(Q.rings, P.rings, a, d, -1);
+  }
+  function shift(P, a, d){
+    P.rings.forEach(function(ring){ ring.forEach(function(q){ q[a] -= d; }); });
+    P.bb[a] -= d; P.bb[a + 2] -= d; if (a) P.pl.ty -= d; else P.pl.tx -= d;
+  }
+  Object.keys(bySheet).forEach(function(k){
+    var L = bySheet[k];
+    L.sort(function(x, y){ return x.bb[1] - y.bb[1] || x.bb[0] - y.bb[0]; });
+    for (var it=0; it<8; it++){
+      var moved = 0;
+      L.forEach(function(P){
+        [1, 0].forEach(function(a){
+          var d = P.bb[a] - prep.edge;
+          for (var q=0; q<L.length && d > 0.02; q++) if (L[q] !== P) d = slide(P, L[q], a, d);
+          if (d > 0.02){ shift(P, a, d); moved += d; }
+        });
+      });
+      if (moved < 0.05) break;
+    }
+  });
+}
+// Share of the sheet taken up by the box around every part on it, which is the stock no longer usable as an offcut.
+function sheetUsed(s){
+  var b = [1e18, 1e18, -1e18, -1e18];
+  s.place.forEach(function(pl){ pl.outer.forEach(function(q){ if (q[0] < b[0]) b[0] = q[0]; if (q[1] < b[1]) b[1] = q[1]; if (q[0] > b[2]) b[2] = q[0]; if (q[1] > b[3]) b[3] = q[1]; }); });
+  return b[2] > b[0] ? Math.min(1, (b[2] - b[0])*(b[3] - b[1])/(s.w*s.h)) : 0;
+}
+function sheetsFromPack(parts, prep, out, o){
+  var full = [], offs = {}, over = [], nStock = prep.stock.length;
+  out = out.map(function(pl){ return Object.assign({}, pl); });
+  if (o.nestSettle !== false) settleParts(prep, out);
+  out.forEach(function(pl, k){
+    var meta = prep.metas[k], p = parts[meta.idx];
+    if (pl.oversize){
+      var b = p.bbox, s0 = { w: b[2] - b[0] + 2*o.margin, h: b[3] - b[1] + 2*o.margin, place: [], oversize: true };
+      s0.place.push(placeWith(p, function(pt){ return [pt[0] - b[0] + o.margin, pt[1] - b[1] + o.margin]; }, 0)); over.push({ s: s0, name: p.name }); return;
+    }
+    var r = meta.rots[pl.rot], c = Math.cos(r.deg*Math.PI/180), sn = Math.sin(r.deg*Math.PI/180);
+    var tx = pl.tx != null ? pl.tx : pl.X*prep.res - r.ox, ty = pl.ty != null ? pl.ty : pl.Y*prep.res - r.oy;
+    var st = pl.sheet < nStock ? prep.stock[pl.sheet] : null, s;
+    if (st) s = offs[pl.sheet] || (offs[pl.sheet] = { w: st.w, h: st.h, place: [], offcut: true });
+    else { var fi = pl.sheet - nStock; while (full.length <= fi) full.push({ w: o.sheetW, h: o.sheetH, place: [] }); s = full[fi]; }
+    var f = function(pt){ return [c*pt[0] - sn*pt[1] + tx, sn*pt[0] + c*pt[1] + ty]; };
+    // Turned sheet back to the real one: (x, y) -> (y, H - x), a quarter turn clockwise.
+    var g = prep.turn ? function(pt){ var q = f(pt); return [q[1], s.h - q[0]]; } : f;
+    s.place.push(placeWith(p, g, r.deg - (prep.turn ? 90 : 0)));
+  });
+  var sheets = Object.keys(offs).map(Number).sort(function(a, b){ return a - b; }).map(function(k){ return offs[k]; })
+    .concat(full.filter(function(s){ return s.place.length; })).concat(over.map(function(x){ return x.s; }));
+  sheets.forEach(function(s, i){ s.index = i + 1; s.place.forEach(function(pl){ pl.part.sheet = i + 1; }); });
+  return { sheets: sheets, oversize: over.map(function(x){ return x.name; }) };
+}
+
 function nest(parts, o){
   var W = o.sheetW, H = o.sheetH, m = o.margin, g = o.gap;
   var sheets = [], over = [];
@@ -1407,24 +1885,7 @@ function nest(parts, o){
   function place(p, rot, x, y){
     var b = p.bbox;
     var f = rot ? function(pt){ return [b[3] - pt[1] + x, pt[0] - b[0] + y]; } : function(pt){ return [pt[0] - b[0] + x, pt[1] - b[1] + y]; };
-    var outer = p.outer.map(f), holes = p.holes.map(function(h){ return h.map(f); }), rings = [outer].concat(holes);
-    // Cut paths, with holding tabs on the outline and on holes big enough to drop a slug.
-    var cutGeo = [], marks = [];
-    rings.forEach(function(rg, ri){
-      var layer = ri ? 'CUT_INNER' : 'CUT_OUTER';
-      if (!o.tabs || (ri && Math.abs(areaOf(rg)) < 1600)){ cutGeo.push({ pts: rg, closed: true, layer: layer }); return; }
-      var rt = ringTabs(rg, rings, o);
-      if (!rt.tabs.length){ cutGeo.push({ pts: rg, closed: true, layer: layer }); return; }
-      if (o.tabStyle === 'bridges') ringWithGaps(rg, rt, o.tabW).forEach(function(ln){ cutGeo.push({ pts: ln, closed: false, layer: layer }); });
-      else cutGeo.push({ pts: rg, closed: true, layer: layer });
-      rt.tabs.forEach(function(t){ marks.push(tabMarker(t, o.tabW, (o.machine === 'cnc' ? o.bit : 1) + 2)); });
-    });
-    return { part: p, rot: rot, outer: outer, holes: holes, cutGeo: cutGeo, tabs: marks, engrave: (p.engrave || []).map(function(l){ return l.map(f); }),
-      labels: p.labels.map(function(L){
-        var q = f([L.u, L.v]), ang = (L.angle || 0) + (rot ? 90 : 0);
-        if (ang > 90.01) ang -= 180;
-        return { main: L.main, lines: textStrokes(L.text, q[0], q[1], L.size, ang) };
-      }) };
+    var pl = placeWith(p, f, rot ? 90 : 0); pl.rot = rot; return pl;
   }
   items.forEach(function(it){
     if (!it.oris.length){
@@ -1586,6 +2047,96 @@ function sampleIsland(){
   for (i=0;i<edge.length;i++){ var p = edge[i], q = edge[(i+1)%edge.length]; tri(p, bot(p), bot(q)); tri(p, bot(q), q); }
   return { pos: new Float32Array(out) };
 }
+// Wall-art relief: diagonal waves over a flat back, sized like a small wall panel (600 × 300 mm).
+function sampleWave(){
+  var NX = 150, NY = 75, SX = 600, SY = 300, top = [], i, j;
+  function h(x, y){ return 34 + 14*Math.sin((x + 0.8*y)/38 + 1.2*Math.sin(x/150)) + 8*Math.sin((x - 0.5*y)/90); }
+  for (i=0;i<=NX;i++){ top.push([]); for (j=0;j<=NY;j++){ var x = -SX/2 + SX*i/NX, y = -SY/2 + SY*j/NY; top[i].push([x, y, h(x, y)]); } }
+  var out = [];
+  function tri(a,b,c){ out.push(a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2]); }
+  function bot(p){ return [p[0], p[1], 0]; }
+  for (i=0;i<NX;i++) for (j=0;j<NY;j++){
+    var a = top[i][j], b = top[i+1][j], c = top[i+1][j+1], d = top[i][j+1];
+    tri(a,b,c); tri(a,c,d); tri(bot(a),bot(c),bot(b)); tri(bot(a),bot(d),bot(c));
+  }
+  var edge = [];
+  for (i=0;i<NX;i++) edge.push(top[i][0]); for (j=0;j<NY;j++) edge.push(top[NX][j]);
+  for (i=NX;i>0;i--) edge.push(top[i][NY]); for (j=NY;j>0;j--) edge.push(top[0][j]);
+  for (i=0;i<edge.length;i++){ var p = edge[i], q = edge[(i+1)%edge.length]; tri(p, bot(p), bot(q)); tri(p, bot(q), q); }
+  return { pos: new Float32Array(out) };
+}
+// ---------- wall-art relief generator ----------
+// A random relief panel: a flat back and a patterned front, as a closed mesh ready to slice into fins.
+// p = { type, W, H, base, depth, detail, seed }. Patterns are normalised so the front spans exactly base..base+depth.
+function rng32(seed){ var a = (seed >>> 0) || 1; return function(){ a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0)/4294967296; }; }
+function valueNoise(rand){
+  var P = 64, g = []; for (var i=0;i<P*P;i++) g.push(rand());
+  var sm = function(t){ return t*t*(3 - 2*t); };
+  return function(x, y){
+    var xi = Math.floor(x), yi = Math.floor(y), fx = sm(x - xi), fy = sm(y - yi);
+    var at = function(i, j){ return g[(((j % P) + P) % P)*P + (((i % P) + P) % P)]; };
+    var a = at(xi, yi), b = at(xi + 1, yi), c = at(xi, yi + 1), d = at(xi + 1, yi + 1);
+    return (a + (b - a)*fx) + ((c + (d - c)*fx) - (a + (b - a)*fx))*fy;
+  };
+}
+function reliefField(p){
+  var rand = rng32(p.seed), W = p.W, H = p.H, n = Math.max(1, Math.round(p.detail)), S = Math.min(W, H);
+  var noise = valueNoise(rand), fbm = function(x, y, oct){ var v = 0, amp = 0.5, f = 1; for (var o=0;o<oct;o++){ v += amp*(noise(x*f, y*f)*2 - 1); amp *= 0.5; f *= 2.03; } return v; };
+  var r = function(a, b){ return a + (b - a)*rand(); };
+  if (p.type === 'ripples'){
+    // Water droplets: damped circular waves from random impact points, interfering where they meet.
+    var drops = []; for (var i=0;i<Math.max(1, Math.round(n*0.6));i++) drops.push({ x: r(-0.45, 0.45)*W, y: r(-0.45, 0.45)*H, lam: r(0.16, 0.26)*S, amp: i ? r(0.4, 0.9) : 1, R: r(0.4, 0.9)*S, ph: r(0, 6.28) });
+    return function(x, y){ var v = 0; drops.forEach(function(d){ var q = Math.hypot(x - d.x, y - d.y); v += d.amp*Math.cos(6.2832*q/d.lam + d.ph)*Math.exp(-q/d.R)*(1 - Math.exp(-q*q/(d.lam*d.lam*0.6))) + d.amp*0.6*Math.exp(-q*q/(d.lam*d.lam*0.15)); }); return v; };
+  }
+  if (p.type === 'waves'){
+    // Long swells: a few directional waves whose crests bend slowly across the panel.
+    var ws = []; var th0 = r(0, 3.1416); for (var j=0;j<Math.min(4, n);j++) ws.push({ th: th0 + r(-0.5, 0.5), lam: r(0.25, 0.6)*S, amp: j ? r(0.25, 0.6) : 1, ph: r(0, 6.28), bend: r(0.4, 1.4), bl: r(0.5, 1.2)*S });
+    return function(x, y){ var v = 0; ws.forEach(function(w){ var u = x*Math.cos(w.th) + y*Math.sin(w.th), t = -x*Math.sin(w.th) + y*Math.cos(w.th); v += w.amp*Math.sin(6.2832*u/w.lam + w.ph + w.bend*Math.sin(t/w.bl)); }); return v; };
+  }
+  if (p.type === 'cloth'){
+    // Draped cloth: folds that run roughly one way, twist and merge, from domain-warped ridges, plus a soft sag.
+    var th = r(0, 3.1416), lam = r(0.2, 0.3)*S*5/(n + 2), warpA = r(0.5, 0.9)*lam, ws2 = r(1, 2)/S;
+    return function(x, y){
+      var wx = x + warpA*fbm(x*ws2, y*ws2, 2)*3, wy = y + warpA*fbm(x*ws2 + 9.1, y*ws2 + 3.7, 2)*3;
+      var u = wx*Math.cos(th) + wy*Math.sin(th), t = -wx*Math.sin(th) + wy*Math.cos(th);
+      // Rounded folds whose height swells and fades along their length, over a gentle sag.
+      var k = 0.5 + 0.5*Math.sin(6.2832*u/lam + 1.5*fbm(t/S*1.2, u/S*0.4, 2)), env = 0.35 + 0.65*Math.max(0, Math.min(1, 0.5 + 1.6*fbm(t/S*1.4 + 2, u/S*0.6 + 5, 2)));
+      return Math.pow(k, 1.4)*env + 0.45*fbm(x/S*0.9 + 4, y/S*0.9, 2);
+    };
+  }
+  if (p.type === 'dunes'){
+    // Sand dunes: asymmetric crests (gentle windward slope, steep lee) with wandering crest lines.
+    var thd = r(0, 3.1416), lamd = S/(1 + n*0.6)*r(0.8, 1.2), wd = r(1, 2.5)/S;
+    return function(x, y){
+      var u = x*Math.cos(thd) + y*Math.sin(thd) + lamd*0.6*fbm(x*wd, y*wd, 3)*2.5, f = u/lamd, d = f - Math.floor(f);
+      var prof = d < 0.75 ? d/0.75 : (1 - d)/0.25; prof = prof*prof*(3 - 2*prof);
+      return prof + 0.15*fbm(x/S*4, y/S*4, 2);
+    };
+  }
+  // Hills: soft overlapping mounds and hollows of mixed sizes.
+  var bumps = []; for (var k=0;k<n*3;k++) bumps.push({ x: r(-0.55, 0.55)*W, y: r(-0.55, 0.55)*H, s: r(0.08, 0.28)*S*(k < n ? 1.6 : 1), a: r(-0.6, 1) });
+  return function(x, y){ var v = 0; bumps.forEach(function(b){ v += b.a*Math.exp(-((x - b.x)*(x - b.x) + (y - b.y)*(y - b.y))/(2*b.s*b.s)); }); return v; };
+}
+function genRelief(p){
+  var f = reliefField(p), W = p.W, H = p.H, cell = Math.max(2, Math.max(W, H)/220), NX = Math.max(8, Math.round(W/cell)), NY = Math.max(8, Math.round(H/cell));
+  var hv = new Float64Array((NX + 1)*(NY + 1)), lo = Infinity, hi = -Infinity, i, j;
+  for (i=0;i<=NX;i++) for (j=0;j<=NY;j++){ var v = f(-W/2 + W*i/NX, -H/2 + H*j/NY); hv[i*(NY + 1) + j] = v; if (v < lo) lo = v; if (v > hi) hi = v; }
+  var span = hi - lo || 1, top = [];
+  for (i=0;i<=NX;i++){ top.push([]); for (j=0;j<=NY;j++) top[i].push([-W/2 + W*i/NX, -H/2 + H*j/NY, p.base + p.depth*(hv[i*(NY + 1) + j] - lo)/span]); }
+  var out = [];
+  function tri(a,b,c){ out.push(a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2]); }
+  function bot(q){ return [q[0], q[1], 0]; }
+  for (i=0;i<NX;i++) for (j=0;j<NY;j++){
+    var a = top[i][j], b = top[i+1][j], c = top[i+1][j+1], d = top[i][j+1];
+    tri(a,b,c); tri(a,c,d);
+  }
+  var edge = [];
+  for (i=0;i<NX;i++) edge.push(top[i][0]); for (j=0;j<NY;j++) edge.push(top[NX][j]);
+  for (i=NX;i>0;i--) edge.push(top[i][NY]); for (j=NY;j>0;j--) edge.push(top[0][j]);
+  // Sides, and the flat back as a fan from its centre so every edge vertex is shared (no T-junctions).
+  for (i=0;i<edge.length;i++){ var q1 = edge[i], q2 = edge[(i+1)%edge.length]; tri(q1, bot(q1), bot(q2)); tri(q1, bot(q2), q2); tri([0, 0, 0], bot(q2), bot(q1)); }
+  return { pos: new Float32Array(out), grid: { NX: NX, NY: NY, h: hv, lo: lo, span: span } };
+}
 // CORE END
 </script>
 <script>
@@ -1600,6 +2151,35 @@ function sampleIsland(){
     applyTheme(saved);
     document.querySelectorAll('input[name="theme"]').forEach(function(r){ r.addEventListener('change', function(){ applyTheme(r.value); try { localStorage.setItem('3d2cnc-theme', r.value); } catch(e){} }); });
   })();
+  // Collapsible sections (Project and Model stay open) and a resizable settings panel. Remembered per browser.
+  (function(){
+    var store = function(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch(e){ return null; } };
+    var closed = {}; try { closed = JSON.parse(store('3d2cnc-closed') || '{}') || {}; } catch(e){ closed = {}; }
+    document.querySelectorAll('.rail section.grp').forEach(function(sec){
+      var h = sec.querySelector('h2'); if (!h) return;
+      var key = h.textContent.trim();
+      if (key === 'Project' || key === 'Model') return;
+      sec.classList.add('fold'); h.setAttribute('role', 'button'); h.setAttribute('tabindex', '0');
+      var set = function(c){ sec.classList.toggle('closed', c); h.setAttribute('aria-expanded', c ? 'false' : 'true'); };
+      set(!!closed[key]);
+      var toggle = function(){ var c = !sec.classList.contains('closed'); set(c); closed[key] = c; store('3d2cnc-closed', JSON.stringify(closed)); };
+      h.addEventListener('click', toggle);
+      h.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); toggle(); } });
+    });
+    var app = document.getElementById('app'), rz = document.getElementById('resizer'), MIN = 280, MAX = 600;
+    var setW = function(wd){ wd = Math.max(MIN, Math.min(MAX, Math.round(wd))); app.style.setProperty('--railW', wd + 'px'); return wd; };
+    var saved = parseInt(store('3d2cnc-railw'), 10); if (saved) setW(saved);
+    var cur = function(){ return parseInt(getComputedStyle(app).getPropertyValue('--railW'), 10) || 330; };
+    rz.addEventListener('pointerdown', function(e){
+      e.preventDefault(); rz.classList.add('drag'); try { rz.setPointerCapture(e.pointerId); } catch(err){}
+      var x0 = e.clientX, w0 = cur();
+      var move = function(ev){ setW(w0 + ev.clientX - x0); };
+      var up = function(){ rz.classList.remove('drag'); rz.removeEventListener('pointermove', move); rz.removeEventListener('pointerup', up); rz.removeEventListener('pointercancel', up); store('3d2cnc-railw', String(cur())); };
+      rz.addEventListener('pointermove', move); rz.addEventListener('pointerup', up); rz.addEventListener('pointercancel', up);
+    });
+    rz.addEventListener('dblclick', function(){ setW(330); store('3d2cnc-railw', '330'); });
+    rz.addEventListener('keydown', function(e){ if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ e.preventDefault(); store('3d2cnc-railw', String(setW(cur() + (e.key === 'ArrowRight' ? 20 : -20)))); } });
+  })();
   var dlPromise = null;
   try { if (window.claude && window.claude.use) dlPromise = window.claude.use('downloads'); } catch(e){}
 
@@ -1610,17 +2190,18 @@ function sampleIsland(){
   function opts(){
     return {
       method: radio('method'), machine: radio('machine'), flip: radio('flip') === '1',
-      pair: $('pair').value.split(',').map(Number), stackAxis: +$('stackAxis').value,
+      pair: $('pair').value.split(',').map(Number), stackAxis: +$('stackAxis').value, stackGap: $('stackGap').value, stackGapMm: Math.max(0.5, num('stackGapMm', 12)), washers: $('washers').checked, washerD: Math.max(0, num('washerD', 0)),
       countA: Math.max(1, Math.min(80, Math.round(num('countA', 9)))), countB: Math.max(1, Math.min(80, Math.round(num('countB', 9)))),
       fins: Math.max(2, Math.min(72, Math.round(num('fins', 12)))), rings: Math.max(1, Math.min(80, Math.round(num('rings', 6)))), hub: Math.max(0, num('hub', 0)),
       thick: Math.max(0.5, num('thick', 6)), clear: Math.max(0, num('clear', 0.2)), bit: Math.max(0.1, num('bit', 3.175)),
       relief: $('relief').value, kerf: Math.max(0, num('kerf', 0.15)), kerfComp: $('kerfComp').checked,
-      sheetW: Math.max(50, num('sheetW', 1220)), sheetH: Math.max(50, num('sheetH', 610)), margin: Math.max(0, num('margin', 10)), gap: Math.max(0, num('gap', 8)),
+      sheetW: Math.max(50, num('sheetW', 1220)), sheetH: Math.max(50, num('sheetH', 610)), margin: Math.max(0, num('margin', 10)), gap: Math.max(0, num('gap', 9.5)),
+      nestRot: $('nestRot').value, nestKeep: $('nestKeep').value, nestMethod: $('nestMethod').value, grain: $('grain').value, offcuts: parseOffcuts($('offcuts').value), nestSettle: $('nestSettle').checked, nestTime: +$('nestTime').value, nestRes: +$('nestRes').value, nestHoles: $('nestHoles').checked,
       dropLoose: $('dropLoose').checked, minSize: Math.max(0, num('minSize', 20)), keepClear: Math.max(0, num('keepClear', 0.5)),
       labels: $('labels').checked, groupParts: $('groupParts').checked,
       lighten: $('lighten').checked, web: Math.max(3, num('web', 12)), cell: Math.max(10, num('cell', 60)),
       hollow: $('hollow').checked, wall: Math.max(2, num('wall', 12)), solidBot: Math.max(0, Math.round(num('solidBot', 1))), solidTop: Math.max(0, Math.round(num('solidTop', 1))),
-      dowels: $('dowels').checked, dowelD: Math.max(1, num('dowelD', 6)), dowelN: Math.max(1, Math.min(4, Math.round(num('dowelN', 2)))),
+      dowels: $('dowels').checked, dowelD: Math.max(1, num('dowelD', 6)), dowelN: Math.max(1, Math.min(3, Math.round(num('dowelN', 2)))), dowelHide: $('dowelHide').checked,
       fitTest: $('fitTest').checked, fitFrom: num('fitFrom', -0.1), fitStep: Math.max(0.01, num('fitStep', 0.1)), fitCount: Math.max(1, Math.min(12, Math.round(num('fitCount', 6)))),
       tabs: false, tabStyle: 'markers', tabW: 6, tabSpacing: 150,
       edits: state.edits,
@@ -1638,8 +2219,10 @@ function sampleIsland(){
     function show(sel, on){ document.querySelectorAll(sel).forEach(function(e){ e.hidden = !on; }); }
     show('.cnc-only', o.machine === 'cnc'); show('.laser-only', o.machine === 'laser');
     show('.crate-only', o.method === 'interlock'); show('.rad-only', o.method === 'radial'); show('.stk-only', o.method === 'stack');
-    show('.join-only', o.method !== 'stack');
-    show('.lighten-only', o.method !== 'stack' && o.lighten); show('.hollow-only', o.method === 'stack' && o.hollow); show('.dowel-only', o.method === 'stack' && o.dowels);
+    show('.join-only', o.method !== 'stack'); show('.deep-only', o.nestMethod === 'deep');
+    var fins = o.method === 'stack' && o.stackGap !== '0';
+    show('.fins-only', fins); show('.gapc-only', fins && o.stackGap === 'c'); show('.washer-only', fins && o.washers); show('.nofins-only', !fins);
+    show('.lighten-only', o.method !== 'stack' && o.lighten); show('.hollow-only', o.method === 'stack' && o.hollow); show('.dowel-only', o.method === 'stack' && (o.dowels || fins));
     if (state.model && state.model.bodies.length > 1) $('lockRow').hidden = state.roles.indexOf('keepcut') < 0 || o.method === 'stack';
     var backOk = o.halfOn && o.halfAxis !== 2 && o.method !== 'stack';
     show('.dist-only', o.spacing === 'dist' && o.method !== 'stack');
@@ -1662,7 +2245,7 @@ function sampleIsland(){
   }
 
   // ---------- 3D ----------
-  var cv = $('cv'), renderer, scene, camera, controls, root, ghostGrp, partsGrp, grid, meshes = {};
+  var dowelGrp = null, cv = $('cv'), renderer, scene, camera, controls, root, ghostGrp, partsGrp, grid, meshes = {};
   var has3D = typeof THREE !== 'undefined';
   if (has3D){
     renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
@@ -1674,7 +2257,7 @@ function sampleIsland(){
     var dl = new THREE.DirectionalLight(0xffffff, 0.75); dl.position.set(1, 2, 1.4); scene.add(dl);
     var dl2 = new THREE.DirectionalLight(0xffffff, 0.25); dl2.position.set(-1.5, 0.6, -1); scene.add(dl2);
     root = new THREE.Group(); root.rotation.x = -Math.PI/2; scene.add(root);
-    ghostGrp = new THREE.Group(); partsGrp = new THREE.Group(); root.add(ghostGrp); root.add(partsGrp);
+    ghostGrp = new THREE.Group(); partsGrp = new THREE.Group(); dowelGrp = new THREE.Group(); root.add(ghostGrp); root.add(partsGrp); root.add(dowelGrp);
     new ResizeObserver(resize).observe(cv);
     (function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
   }
@@ -1705,12 +2288,20 @@ function sampleIsland(){
     ghostGrp.visible = $('ghost').checked;
   }
   var mats = null, edgeMat, matSel;
-  function famMat(f){ return f === 'B' || f === 'R' ? mats.b : f === 'K' || f === 'P' ? mats.k : mats.a; }
+  function famMat(f){ return f === 'B' || f === 'R' ? mats.b : f === 'K' || f === 'P' || f === 'W' ? mats.k : mats.a; }
   var matHit = null, hitSet = {};
   function build3D(res, o){
     if (!has3D) return;
     hitSet = {}; (res.collisions || []).forEach(function(c){ hitSet[c[0]] = hitSet[c[1]] = true; });
-    clearGroup(partsGrp); meshes = {};
+    clearGroup(partsGrp); meshes = {}; clearGroup(dowelGrp);
+    var dmat = new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.6 });
+    (res.dowels || []).forEach(function(d){
+      var a = new THREE.Vector3().fromArray(d.p0), b = new THREE.Vector3().fromArray(d.p1), len = a.distanceTo(b);
+      var m = new THREE.Mesh(new THREE.CylinderGeometry(d.dia/2, d.dia/2, len, 18), dmat);
+      m.position.copy(a).add(b).multiplyScalar(0.5);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+      dowelGrp.add(m);
+    });
     if (!mats){
       mats = { a: new THREE.MeshStandardMaterial({ color: 0xe3c28c, roughness: 0.85, side: THREE.DoubleSide }),
                b: new THREE.MeshStandardMaterial({ color: 0xc39257, roughness: 0.85, side: THREE.DoubleSide }),
@@ -2002,17 +2593,15 @@ function sampleIsland(){
       try {
         var o = opts();
         var res = buildParts(state.model, o);
-        var lay = nest(res.parts, o);
-        state.result = res; state.layout = lay;
-        if (lay.oversize.length) res.warnings.push('Too big for the sheet, placed on their own oversize sheets: ' + lay.oversize.join(', ') + '. Use a smaller model or a larger sheet.');
+        res.parts.forEach(function(q){ q.sheet = undefined; });
+        state.result = res; invalidateNest(true); var lay = null;
         if (!res.parts.length && !res.warnings.length) res.warnings.push('No parts were produced. Check that the model is a closed solid and the slice counts are above zero.');
-        build3D(res, o); renderSheets(lay); renderParts(res, o); legend();
+        build3D(res, o); renderSheets(state.layout); renderParts(res, o); legend();
         if (stepping){ buildSteps(); applyStep(); }
         var cut = res.parts.reduce(function(s,p){ return s + p.cut; }, 0);
         $('sParts').textContent = res.parts.length; $('sJoints').textContent = o.method !== 'stack' ? res.joints : '–';
-        $('sSheets').textContent = lay.sheets.length; $('sCut').textContent = (cut/1000).toFixed(1) + ' m';
-        $('tsheets').textContent = 'Sheets (' + lay.sheets.length + ')'; $('tparts').textContent = 'Parts (' + res.parts.length + ')';
-        $('dlAllDxf').disabled = $('dlAllSvg').disabled = $('dlZip').disabled = !lay.sheets.length; moveUI(); snapUI();
+        $('sCut').textContent = (cut/1000).toFixed(1) + ' m'; $('tparts').textContent = 'Parts (' + res.parts.length + ')';
+        $('dlAllDxf').disabled = $('dlAllSvg').disabled = !res.parts.length; nestStats(); moveUI(); snapUI();
         var w = $('warns'); w.innerHTML = ''; res.warnings.forEach(function(t){ var d = document.createElement('div'); d.textContent = t; w.appendChild(d); });
       } catch (e) { console.error(e); toast('Slicing failed: ' + e.message); }
       $('busy').hidden = true;
@@ -2020,10 +2609,14 @@ function sampleIsland(){
   }
   function renderSheets(lay){
     var v = $('vsheets'); v.innerHTML = '';
+    if (!lay){
+      v.innerHTML = '<div class="empty"><b>Not nested yet</b><span>' + (state.nestStale ? 'The parts or nesting settings changed since the last run.' : 'Nesting is optional. Export every part in one file from the Export step, or lay the parts out on sheets here.') + '</span><button class="btn primary" type="button" id="runNest2">Run nesting</button></div>';
+      $('runNest2').addEventListener('click', runNest);
+      return;
+    }
     lay.sheets.forEach(function(s){
-      var used = s.place.reduce(function(a,pl){ return a + pl.part.area; }, 0);
       var div = document.createElement('div'); div.className = 'sheet';
-      div.innerHTML = '<h3>Sheet ' + s.index + (s.oversize ? ' (oversize)' : '') + '<small>' + s.w.toFixed(0) + ' × ' + s.h.toFixed(0) + ' mm · ' + s.place.length + ' parts · ' + Math.round(100*used/(s.w*s.h)) + '% used</small></h3><div class="wrap">' + svgSheet(s, opts(), true) + '</div>';
+      div.innerHTML = '<h3>Sheet ' + s.index + (s.oversize ? ' (oversize)' : s.offcut ? ' (offcut)' : '') + '<small>' + s.w.toFixed(0) + ' × ' + s.h.toFixed(0) + ' mm · ' + s.place.length + ' parts · ' + Math.round(100*sheetUsed(s)) + '% used</small></h3><div class="wrap">' + svgSheet(s, opts(), true) + '</div>';
       v.appendChild(div);
     });
     v.querySelectorAll('.part').forEach(function(e){ e.addEventListener('click', function(){ select(e.getAttribute('data-part')); }); });
@@ -2039,6 +2632,7 @@ function sampleIsland(){
     if (res.parts.some(function(p){ return p.fam === 'K'; })) guide += ' K parts are your inserts; drop them into the space reserved for them last.';
     if (res.parts.some(function(p){ return p.name === 'BASE'; })) guide += ' Start by slotting the panels into the BASE.';
     if (res.parts.some(function(p){ return p.name === 'BACK'; })) guide += ' The BACK plate sits against the wall; hang it on screws through the keyholes, then fit the panels.';
+    if ((res.dowels || []).length) guide += ' Dowels (Ø' + res.dowels[0].dia + ' mm): ' + res.dowels.map(function(d){ return d.name + ' ' + d.len.toFixed(0) + ' mm long, ' + d.from + '–' + d.to + ' (' + d.drilled + ' holes)'; }).join('; ') + '. Thread each one through its layers as you stack them.';
     if ((res.dupGroups || []).length) guide += ' Identical shapes: ' + res.dupGroups.map(function(g){ return (g.length <= 4 ? g.join('/') : g[0] + ', ' + g[1] + ' … ' + g[g.length-1]) + ' (×' + g.length + ')'; }).join('; ') + '. Their slot labels differ, but any of them fits.';
     var rows = res.parts.map(function(p){
       var w = p.bbox[2]-p.bbox[0], h = p.bbox[3]-p.bbox[1];
@@ -2063,11 +2657,116 @@ function sampleIsland(){
     a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
   }
+  // ---------- nesting ----------
+  var NEST_SRC = 'var gridPack = ' + gridPack.toString() + ';\nvar deepNest = ' + deepNest.toString() + ';\nonmessage = function(e){ try { var d = e.data; if (d.deep){ deepNest(d.job, d.seconds, function(m){ postMessage(m); }); postMessage({ end: true }); } else { var r = gridPack(d.job, function(p){ postMessage({ progress: p }); }); postMessage({ done: r }); } } catch(err){ postMessage({ error: String(err && err.message || err) }); } };';
+  var nestWorker = null;
+  function nestStats(){
+    var lay = state.layout;
+    $('sSheets').textContent = lay ? lay.sheets.length : '–';
+    $('tsheets').textContent = lay ? 'Sheets (' + lay.sheets.length + ')' : 'Sheets';
+    $('dlZip').disabled = !lay;
+  }
+  function invalidateNest(partsChanged){
+    if (nestWorker){ nestWorker.terminate(); nestWorker = null; }
+    nestIdle();
+    var had = !!state.layout; state.layout = null; state.nestStale = had || state.nestStale;
+    if (state.result) state.result.parts.forEach(function(q){ q.sheet = undefined; });
+    $('nestStatus').textContent = had ? 'Out of date: the ' + (partsChanged ? 'parts' : 'nesting settings') + ' changed. Run nesting again.' : 'Not nested yet.';
+    nestStats();
+    if (!partsChanged){ renderSheets(null); if (state.result) renderParts(state.result, opts()); }
+  }
+  function nestIdle(){ var b = $('runNest'); b.disabled = false; b.textContent = 'Run nesting'; nestStop = null; }
+  var nestStop = null;
+  function runNest(){
+    if (nestStop){ nestStop(); return; }
+    if (!state.result || !state.result.parts.length) return;
+    $('runNest').disabled = true; $('nestStatus').textContent = 'Preparing part shapes…';
+    setTimeout(nestNow, 30);
+  }
+  function nestNow(){
+    var o = opts(), parts = state.result.parts, t0 = Date.now(), prep, deep = o.nestMethod === 'deep';
+    try { prep = prepNest(parts, o); } catch(e){ console.error(e); nestIdle(); $('nestStatus').textContent = ''; toast('Nesting failed: ' + e.message); return; }
+    $('nestStatus').textContent = deep ? 'Deep nesting: first layout…' : 'Nesting… 0%';
+    var summary = function(lay){
+      var used = lay.sheets.filter(function(x){ return !x.oversize; }).map(function(x){ return Math.round(100*sheetUsed(x)) + '%'; });
+      return parts.length + ' parts on ' + lay.sheets.length + ' sheet' + (lay.sheets.length > 1 ? 's' : '') + (used.length ? ' (' + used.join(', ') + ' used)' : '');
+    };
+    var show = function(out){
+      var lay = sheetsFromPack(parts, prep, out, o); state.layout = lay; state.nestStale = false;
+      renderSheets(lay); renderParts(state.result, opts()); nestStats(); applySel();
+      return lay;
+    };
+    var over = function(lay){ return lay.oversize.length ? ' Too big for the sheet, so given their own oversize sheets: ' + lay.oversize.join(', ') + '.' : ''; };
+    var toSheets = function(){ document.querySelectorAll('.tabs button').forEach(function(x){ if (x.id === 'tsheets') x.click(); }); };
+    var finish = function(out){
+      nestWorker = null; nestIdle();
+      var lay = show(out);
+      $('nestStatus').textContent = 'Nested ' + summary(lay) + ' in ' + ((Date.now() - t0)/1000).toFixed(1) + ' s.' + over(lay);
+      toSheets();
+    };
+    if (deep){
+      // Each better layout is shown as it arrives (at most every 1.5 s); Stop or the time limit keeps the best.
+      var bestOut = null, bestLay = null, shownAt = 0, pend = null, gen = 0, evals = 0, firstShown = false;
+      var paint = function(){ pend = null; shownAt = Date.now(); bestLay = show(bestOut); if (!firstShown){ firstShown = true; toSheets(); } status(); };
+      var status = function(){ if (bestLay) $('nestStatus').textContent = 'Deep nesting… ' + evals + ' layouts tried, best: ' + summary(bestLay) + '. Press Stop to keep it.'; };
+      var done = function(why){
+        if (nestWorker){ nestWorker.terminate(); nestWorker = null; }
+        if (pend){ clearTimeout(pend); pend = null; }
+        nestIdle();
+        if (!bestOut){ $('nestStatus').textContent = 'Stopped before the first layout finished.'; return; }
+        bestLay = show(bestOut); toSheets();
+        $('nestStatus').textContent = 'Deep nesting ' + why + ' after ' + evals + ' layouts (' + ((Date.now() - t0)/1000).toFixed(0) + ' s): ' + summary(bestLay) + '.' + over(bestLay);
+      };
+      try { nestWorker = new Worker(URL.createObjectURL(new Blob([NEST_SRC], { type: 'text/javascript' }))); }
+      catch(e){ nestIdle(); $('nestStatus').textContent = 'Deep nesting needs Web Workers, which this browser blocked. Use Quick.'; return; }
+      var b = $('runNest'); b.disabled = false; b.textContent = 'Stop';
+      nestStop = function(){ done('stopped'); };
+      nestWorker.onmessage = function(e){
+        var d = e.data;
+        if (d.best){ bestOut = d.best; gen = d.gen; evals = d.evals; if (Date.now() - shownAt > 1500) paint(); else if (!pend) pend = setTimeout(paint, 1500); }
+        else if (d.tick){ evals = d.evals; gen = d.gen; status(); }
+        else if (d.end) done('finished');
+        else if (d.error){ done('failed (' + d.error + ')'); }
+      };
+      nestWorker.onerror = function(){ done('failed'); };
+      nestWorker.postMessage({ deep: true, job: prep.job, seconds: o.nestTime });
+      return;
+    }
+    try {
+      nestWorker = new Worker(URL.createObjectURL(new Blob([NEST_SRC], { type: 'text/javascript' })));
+      nestWorker.onmessage = function(e){
+        if (e.data.progress != null) $('nestStatus').textContent = 'Nesting… ' + Math.round(100*e.data.progress) + '%';
+        else if (e.data.done){ nestWorker.terminate(); finish(e.data.done); }
+        else if (e.data.error){ nestWorker.terminate(); nestWorker = null; nestIdle(); $('nestStatus').textContent = 'Nesting failed: ' + e.data.error; }
+      };
+      nestWorker.onerror = function(){ nestWorker.terminate(); nestWorker = null; setTimeout(function(){ finish(gridPack(prep.job)); }, 10); };
+      nestWorker.postMessage({ job: prep.job });
+    } catch(e){ setTimeout(function(){ finish(gridPack(prep.job)); }, 10); }
+  }
+  $('runNest').addEventListener('click', runNest);
+  // Part spacing follows 3 × bit (2 mm on a laser) until the user types their own value.
+  var gapAuto = true;
+  function autoGap(){ if (!gapAuto) return; var o = opts(); $('gap').value = o.machine === 'cnc' ? (Math.round(o.bit*3*10)/10) : 2; }
+  $('gap').addEventListener('input', function(){ gapAuto = false; $('gapHint').textContent = 'Custom spacing. Clear the field to follow 3 × bit again.'; });
+  $('gap').addEventListener('change', function(){ if ($('gap').value === ''){ gapAuto = true; autoGap(); $('gapHint').textContent = 'Spacing follows 3 × bit diameter until you change it.'; } });
+  $('bit').addEventListener('input', autoGap);
+  document.querySelectorAll('input[name="machine"]').forEach(function(r){ r.addEventListener('change', autoGap); });
+  // Workflow steps: Design (model, slicing, tooling, panels) and Export (labels, files, optional nesting).
+  function setStep(st){
+    document.querySelectorAll('[data-step]').forEach(function(el){ el.classList.toggle('offstep', el.getAttribute('data-step') !== st); });
+    var r = document.querySelector('input[name="wstep"][value="' + st + '"]'); if (r) r.checked = true;
+    document.querySelectorAll('.tabs button').forEach(function(x){ if (x.id === (st === 'export' ? 'tsheets' : 't3d')) x.click(); });
+    try { localStorage.setItem('3d2cnc-step', st); } catch(e){}
+  }
+  document.querySelectorAll('input[name="wstep"]').forEach(function(r){ r.addEventListener('change', function(){ setStep(r.value); }); });
+  $('toExport').addEventListener('click', function(){ setStep('export'); $('app').querySelector('.rail').scrollTop = 0; });
+  $('toDesign').addEventListener('click', function(){ setStep('design'); $('app').querySelector('.rail').scrollTop = 0; });
+
   $('dlZip').addEventListener('click', async function(){
     if (!state.layout) return;
     var o = opts(), zip = new JSZip(), base = (state.name || 'model').replace(/[^\w-]+/g, '_');
     state.layout.sheets.forEach(function(s){
-      var n = base + '_sheet' + String(s.index).padStart(2, '0') + (s.oversize ? '_oversize' : '');
+      var n = base + '_sheet' + String(s.index).padStart(2, '0') + (s.oversize ? '_oversize' : s.offcut ? '_offcut' : '');
       zip.file(n + '.dxf', dxfSheet(s, o)); zip.file(n + '.svg', svgSheet(s, o, false));
     });
     var csv = ['part,plane,width_mm,height_mm,area_cm2,joints,same_shape_as,cut_m,sheet'].concat(state.result.parts.map(function(p){
@@ -2086,7 +2785,7 @@ function sampleIsland(){
     var top = 0; sh.place.forEach(function(pl){ pl.outer.forEach(function(q){ top = Math.max(top, q[1]); }); });
     sh.h = top + o.margin; sh.w = W;
     lay.sheets.forEach(function(x){ x.place.forEach(function(pl){ pl.part.sheet = undefined; }); });
-    state.layout.sheets.forEach(function(x){ x.place.forEach(function(pl){ pl.part.sheet = x.index; }); });
+    if (state.layout) state.layout.sheets.forEach(function(x){ x.place.forEach(function(pl){ pl.part.sheet = x.index; }); });
     return sh;
   }
   function baseName(){ return (state.name || 'model').replace(/[^\w-]+/g, '_'); }
@@ -2096,13 +2795,14 @@ function sampleIsland(){
   // ---------- projects ----------
   function b64(buf){ var u = new Uint8Array(buf), s = '', CH = 0x8000; for (var i=0;i<u.length;i+=CH) s += String.fromCharCode.apply(null, u.subarray(i, i+CH)); return btoa(s); }
   function unb64(str){ var s = atob(str), u = new Uint8Array(s.length); for (var i=0;i<s.length;i++) u[i] = s.charCodeAt(i); return u.buffer; }
-  function railControls(){ return Array.prototype.filter.call(document.querySelectorAll('.rail input, .rail select'), function(el){ return el.id && el.type !== 'file' && el.type !== 'radio' && el.id !== 'sample' && el.id.indexOf('role-') !== 0; }); }
+  function railControls(){ return Array.prototype.filter.call(document.querySelectorAll('.rail input, .rail select'), function(el){ return el.id && el.type !== 'file' && el.type !== 'radio' && el.id !== 'sample' && el.id !== 'shareUrl' && el.id.indexOf('role-') !== 0; }); }
   function projectData(){
     var settings = {}, radios = {};
     railControls().forEach(function(el){ settings[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
     ['method', 'flip', 'machine'].forEach(function(n){ radios[n] = radio(n); });
     var d = { app: '3d2cnc', version: 1, name: state.name, settings: settings, radios: radios, roles: state.roles.slice(), R: state.R.slice(), moves: state.moves, edits: state.edits };
     if (state.sampleKey) d.sample = state.sampleKey;
+    else if (state.genParams) d.gen = state.genParams;
     else d.model = { verts: b64(new Float32Array(state.raw.verts).buffer), tris: b64(new Uint32Array(state.raw.tris).buffer),
                      bodies: state.raw.bodies.map(function(b){ return { name: b.name, tris: b64(new Int32Array(b.tris).buffer) }; }) };
     return d;
@@ -2118,7 +2818,9 @@ function sampleIsland(){
     Object.keys(d.settings || {}).forEach(function(id){ var el = ctl[id]; if (!el) return; if (el.type === 'checkbox') el.checked = !!d.settings[id]; else el.value = d.settings[id]; });
     Object.keys(d.radios || {}).forEach(function(n){ setRadio(n, d.radios[n]); });
     syncVisibility();
+    state.genParams = null;
     if (d.sample && samples[d.sample]){ var sp = samples[d.sample].fn(); state.raw = weld(sp.pos); state.raw.bodies = splitBodies(state.raw, sp.triNames); state.sampleKey = d.sample; $('sample').value = d.sample; }
+    else if (d.gen){ var gr = genRelief(d.gen); state.raw = weld(gr.pos); state.raw.bodies = splitBodies(state.raw); state.sampleKey = null; state.genParams = d.gen; }
     else if (d.model){
       var raw = { verts: Float64Array.from(new Float32Array(unb64(d.model.verts))), tris: new Uint32Array(unb64(d.model.tris)) };
       raw.bodies = d.model.bodies.map(function(b){ return { name: b.name, tris: new Int32Array(unb64(b.tris)) }; });
@@ -2135,6 +2837,244 @@ function sampleIsland(){
     f.text().then(function(t){ try { loadProject(t); } catch(err){ toast(err.message || 'Could not read that project file.'); } });
   });
 
+  // ---------- share links ----------
+  // The whole project (settings, edits and, for an uploaded model, the mesh) deflated into the URL hash.
+  function b64url(u8){ return b64(u8).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function unb64url(str){ str = str.replace(/-/g, '+').replace(/_/g, '/'); while (str.length % 4) str += '='; return new Uint8Array(unb64(str)); }
+  async function deflate(text){
+    var bytes = new TextEncoder().encode(text);
+    if (typeof CompressionStream === 'undefined') return 'j' + b64url(bytes);
+    var buf = await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer();
+    return 'z' + b64url(new Uint8Array(buf));
+  }
+  async function inflate(code){
+    var bytes = unb64url(code.slice(1));
+    if (code[0] === 'j') return new TextDecoder().decode(bytes);
+    var buf = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+    return new TextDecoder().decode(buf);
+  }
+  function shareBase(){
+    var h = location.hostname || '';
+    if (/^https?:$/.test(location.protocol) && !/claude|anthropic|usercontent/i.test(h) && h) return location.origin + location.pathname;
+    return 'https://3d2cnc.nostranger.org/';
+  }
+  $('shareBtn').addEventListener('click', async function(){
+    if (!state.raw) return;
+    try {
+      var url = shareBase() + '#p=' + await deflate(JSON.stringify(projectData()));
+      if (url.length > 1900000){ toast('This model is too big for a link. Use Save project and send the file instead.'); return; }
+      $('sharePanel').hidden = false; $('shareUrl').value = url;
+      var kb = Math.round(url.length/1024);
+      $('shareHint').textContent = (state.sampleKey ? 'Uses the built-in sample, so the link is short.' : 'The model is inside the link (' + kb + ' kB).' + (url.length > 30000 ? ' Some chat apps and email clients cut long links short. If it fails to open, send the saved project file instead.' : '')) +
+        (shareBase().indexOf('nostranger') >= 0 && location.hostname.indexOf('nostranger') < 0 ? ' The link opens the hosted copy at 3d2cnc.nostranger.org.' : '');
+      $('shareUrl').select();
+    } catch(e){ toast('Could not make a link: ' + (e.message || e)); }
+  });
+  $('shareCopy').addEventListener('click', function(){
+    var el = $('shareUrl'); el.select();
+    var done = function(){ toast('Link copied.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(el.value).then(done, function(){ try { document.execCommand('copy'); done(); } catch(e){ toast('Select the link and copy it.'); } });
+    else { try { document.execCommand('copy'); done(); } catch(e){ toast('Select the link and copy it.'); } }
+  });
+  async function openSharedLink(){
+    var m = /[#&]p=([A-Za-z0-9_-]+)/.exec(location.hash || '');
+    if (!m) return false;
+    try { loadProject(await inflate(m[1])); return true; }
+    catch(e){ toast('That share link could not be opened: ' + (e.message || e)); return false; }
+  }
+
+  // ---------- build guide ----------
+  var JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  function loadScript(url){ return new Promise(function(res, rej){ var el = document.createElement('script'); el.src = url; el.onload = res; el.onerror = function(){ rej(new Error('the PDF library did not load')); }; document.head.appendChild(el); }); }
+  // Each step's picture: everything placed so far, with this step's parts in the highlight colour, from the current view.
+  function guideShots(groups){
+    if (!has3D || !Object.keys(meshes).length) return [];
+    if (!matStep) applySel();
+    var W = 1200, H = 800, pr = renderer.getPixelRatio(), ghostOn = ghostGrp.visible, shots = [];
+    ghostGrp.visible = false;
+    renderer.setPixelRatio(1); renderer.setSize(W, H, false); camera.aspect = W/H; camera.updateProjectionMatrix();
+    // Keep the user's viewing direction but pull in so the whole assembly fills the picture.
+    var camPos = camera.position.clone(), box = new THREE.Box3();
+    Object.keys(meshes).forEach(function(k){ meshes[k].visible = true; box.expandByObject(meshes[k]); });
+    if (!box.isEmpty()){
+      var sph = box.getBoundingSphere(new THREE.Sphere()), dir = camera.position.clone().sub(controls.target).normalize();
+      var fov = camera.fov*Math.PI/180, fit = Math.min(fov, 2*Math.atan(Math.tan(fov/2)*camera.aspect));
+      var dist = sph.radius/Math.sin(fit/2);
+      // Two refinements using the projected box corners, so flat or long models are not lost in empty space.
+      for (var it=0; it<2; it++){
+        camera.position.copy(sph.center).add(dir.clone().multiplyScalar(dist)); camera.lookAt(sph.center); camera.updateMatrixWorld();
+        var ext = 0;
+        [0, 1].forEach(function(i){ [0, 1].forEach(function(j){ [0, 1].forEach(function(k){
+          var v = new THREE.Vector3(i ? box.max.x : box.min.x, j ? box.max.y : box.min.y, k ? box.max.z : box.min.z).project(camera);
+          ext = Math.max(ext, Math.abs(v.x), Math.abs(v.y));
+        }); }); });
+        if (ext > 0) dist *= ext/0.9;
+      }
+      camera.position.copy(sph.center).add(dir.clone().multiplyScalar(dist)); camera.lookAt(sph.center); camera.updateMatrixWorld();
+    }
+    var c2 = document.createElement('canvas'); c2.width = W; c2.height = H; var x = c2.getContext('2d');
+    groups.forEach(function(g){
+      var hi = {}; g.names.forEach(function(nm){ hi[nm] = 1; });
+      Object.keys(meshes).forEach(function(k){
+        var me = meshes[k], idx = stepOf[me.userData.panel.name];
+        me.visible = idx !== undefined && idx <= g.last;
+        me.material = hi[me.userData.panel.name] ? matStep : me.userData.base;
+      });
+      renderer.render(scene, camera);
+      x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H); x.drawImage(renderer.domElement, 0, 0);
+      shots.push(c2.toDataURL('image/jpeg', 0.82));
+    });
+    ghostGrp.visible = ghostOn; camera.position.copy(camPos); camera.lookAt(controls.target); renderer.setPixelRatio(pr); resize(); applyStep();
+    return shots;
+  }
+  $('dlGuide').addEventListener('click', async function(){
+    var res = state.result; if (!res || !res.parts.length) return;
+    var btn = this; btn.disabled = true; var label = btn.textContent; btn.textContent = 'Making guide…';
+    try {
+      if (!(window.jspdf && window.jspdf.jsPDF)) await loadScript(JSPDF_URL);
+      var o = opts(), parts = res.parts.slice().sort(function(a, b){ return a.name.localeCompare(b.name, undefined, { numeric: true }); });
+      buildSteps();
+      // Long stacks are grouped so the guide stays around two dozen pictures.
+      var per = Math.max(1, Math.ceil(steps.length/24)), groups = [];
+      for (var i=0;i<steps.length;i+=per){
+        var g = steps.slice(i, i + per), names = g.map(function(z){ return z.name; });
+        var text = g.length === 1 ? g[0].text : g.length === 2 ? g[0].text + ' ' + g[1].text
+          : (i === 0 ? g[0].text + ' Then add ' + names[1] : 'Add ' + names[0]) + ' to ' + names[names.length - 1] + ', one at a time. ' + g[g.length - 1].text;
+        groups.push({ names: names, last: i + g.length - 1, text: text });
+      }
+      var shots = guideShots(groups);
+      var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), PW = 210, PH = 297, M = 14, y = M;
+      var ink = [30, 36, 33], soft = [105, 115, 110], accent = [26, 122, 84];
+      function color(c){ doc.setTextColor(c[0], c[1], c[2]); }
+      function newPage(){ doc.addPage(); y = M; }
+      function need(h){ if (y + h > PH - M) newPage(); }
+      var title = (state.name || 'model').replace(/[_-]+/g, ' ');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20); color(ink); doc.text('Build guide: ' + title, M, y + 7); y += 13;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10); color(soft);
+      var meth = { interlock: 'slotted crate', radial: 'radial fins and rings', stack: 'stacked layers' }[o.method] || o.method;
+      var sheetsN = state.layout ? state.layout.sheets.length : 0;
+      doc.text(parts.length + ' parts · ' + meth + ' · ' + o.thick + ' mm stock' + (sheetsN ? ' · ' + sheetsN + ' sheet' + (sheetsN > 1 ? 's' : '') : '') + ' · ' + steps.length + ' steps · made with 3D2CNC', M, y); y += 9;
+      // Before you start
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); color(ink); doc.text('Before you start', M, y); y += 6;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+      var tips = ['Check every part against the checklist below and tick it off.',
+        'Dry-fit each step before gluing. Slots are cut for ' + o.thick + ' mm stock with ' + o.clear + ' mm clearance; sand the slot, not the face, if a joint is tight.',
+        'Labels are engraved on each part. Slot labels name the part that fits there.'];
+      tips.forEach(function(t){ var ls = doc.splitTextToSize('•  ' + t, PW - 2*M); doc.text(ls, M, y); y += ls.length*4.6 + 1; });
+      y += 4;
+      // Parts checklist with outline thumbnails.
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text('Parts checklist', M, y); y += 4;
+      var cols = 4, cw = (PW - 2*M)/cols, ch = 33, col = 0;
+      parts.forEach(function(p){
+        if (col === 0) need(ch);
+        var x0 = M + col*cw, b = p.bbox, bw = Math.max(1e-6, b[2] - b[0]), bh = Math.max(1e-6, b[3] - b[1]);
+        var sc = Math.min((cw - 8)/bw, (ch - 13)/bh), ox = x0 + (cw - bw*sc)/2, oy = y + 3 + (ch - 13 - bh*sc)/2 + bh*sc;
+        doc.setDrawColor(200, 206, 202); doc.setLineWidth(0.2); doc.roundedRect(x0 + 1, y + 1, cw - 2, ch - 2, 1.5, 1.5);
+        doc.setDrawColor(accent[0], accent[1], accent[2]); doc.setLineWidth(0.25);
+        [p.outer].concat(p.holes).forEach(function(r){
+          var step = Math.max(1, Math.floor(r.length/240));
+          for (var k=0;k<r.length;k+=step){ var a = r[k], c = r[(k + step) % r.length]; doc.line(ox + (a[0] - b[0])*sc, oy - (a[1] - b[1])*sc, ox + (c[0] - b[0])*sc, oy - (c[1] - b[1])*sc); }
+        });
+        doc.setDrawColor(ink[0], ink[1], ink[2]); doc.setLineWidth(0.3); doc.rect(x0 + 4, y + ch - 8.2, 3.4, 3.4);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); color(ink); doc.text(p.name, x0 + 9.5, y + ch - 5.3);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); color(soft);
+        doc.text(Math.round(bw) + ' × ' + Math.round(bh) + (p.sheet ? ' · sheet ' + p.sheet : ''), x0 + cw - 3, y + ch - 5.3, { align: 'right' });
+        col++; if (col === cols){ col = 0; y += ch; }
+      });
+      if (col) y += ch;
+      // Steps, two to a page.
+      newPage();
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(14); color(ink); doc.text('Assembly', M, y + 5); y += 11;
+      groups.forEach(function(g, gi){
+        var imgW = PW - 2*M, imgH = imgW*2/3*0.78, txt = doc.splitTextToSize(g.text, PW - 2*M - 22), blockH = 8 + txt.length*4.8 + (shots[gi] ? imgH + 4 : 0) + 6;
+        need(blockH);
+        doc.setFillColor(accent[0], accent[1], accent[2]); doc.roundedRect(M, y, 18, 7, 1.2, 1.2, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(255, 255, 255); doc.text(String(gi + 1), M + 9, y + 5, { align: 'center' });
+        color(ink); doc.setFontSize(11); doc.text(g.names.length > 3 ? g.names[0] + ' – ' + g.names[g.names.length - 1] : g.names.join(', '), M + 22, y + 5);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10); color(ink); doc.text(txt, M + 22, y + 11); y += 8 + txt.length*4.8;
+        if (shots[gi]){ var iw = imgH*1.5; doc.addImage(shots[gi], 'JPEG', M + (imgW - iw)/2, y, iw, imgH); y += imgH + 4; }
+        y += 6;
+      });
+      var np = doc.getNumberOfPages();
+      for (var pg=1; pg<=np; pg++){ doc.setPage(pg); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); color(soft); doc.text(title + ' · page ' + pg + ' of ' + np, PW/2, PH - 6, { align: 'center' }); }
+      await saveFile(baseName() + '_build_guide.pdf', doc.output('blob'));
+    } catch(e){ console.error(e); toast('Could not make the guide: ' + (e.message || e)); }
+    btn.disabled = false; btn.textContent = label;
+  });
+
+  // ---------- wall art generator (its own mode) ----------
+  var GEN_TYPES = ['ripples', 'waves', 'cloth', 'dunes', 'hills'], artTimer = null, artLast = null;
+  function genParams(){
+    var cl = function(v, a, b){ return Math.max(a, Math.min(b, v)); };
+    return { type: $('genType').value, W: cl(num('genW', 600), 100, 3000), H: cl(num('genH', 300), 100, 3000), base: Math.max(5, num('genBase', 15)),
+      depth: Math.max(5, num('genDepth', 40)), detail: Math.round(cl(num('genDetail', 5), 1, 12)), seed: Math.max(1, Math.round(num('genSeed', 1))) };
+  }
+  // Large hillshaded preview, lit from the top left, with the gaps between fins shaded in.
+  function drawGenPreview(g, p){
+    var view = $('vart'), cv2 = $('artCv'), vw = Math.max(200, view.clientWidth - 48), vh = Math.max(150, view.clientHeight - 80);
+    var sc = Math.min(vw/p.W, vh/p.H), cw = Math.max(50, Math.round(p.W*sc)), ch = Math.max(30, Math.round(p.H*sc)), dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv2.width = Math.round(cw*dpr); cv2.height = Math.round(ch*dpr); cv2.style.width = cw + 'px'; cv2.style.height = ch + 'px';
+    var NX1 = g.NX + 1, NY1 = g.NY + 1, dx = p.W/g.NX, dy = p.H/g.NY, off = document.createElement('canvas'); off.width = NX1; off.height = NY1;
+    var ox = off.getContext('2d'), im = ox.createImageData(NX1, NY1);
+    var zAt = function(i, j){ i = Math.max(0, Math.min(g.NX, i)); j = Math.max(0, Math.min(g.NY, j)); return p.depth*(g.h[i*NY1 + j] - g.lo)/g.span; };
+    for (var j=0; j<NY1; j++) for (var i=0; i<NX1; i++){
+      var gx = (zAt(i + 1, j) - zAt(i - 1, j))/(2*dx), gy = (zAt(i, j + 1) - zAt(i, j - 1))/(2*dy), nl = Math.hypot(gx, gy, 1);
+      var sh = Math.max(0, (0.6*gx - 0.5*gy + 0.62)/nl), hgt = zAt(i, j)/p.depth, k = ((g.NY - j)*NX1 + i)*4;
+      im.data[k] = 60 + 170*sh + 15*hgt; im.data[k + 1] = 46 + 142*sh + 12*hgt; im.data[k + 2] = 30 + 98*sh + 8*hgt; im.data[k + 3] = 255;
+    }
+    ox.putImageData(im, 0, 0);
+    var x = cv2.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.drawImage(off, 0, 0, cw, ch);
+    var t = Math.max(1, num('genThick', 6)), gapL = (+$('genGap').value || 1)*t, alongX = $('genDir').value === '0', span = alongX ? p.W : p.H;
+    var pitch = t + gapL, count = Math.max(1, Math.floor((span + gapL)/pitch + 1e-6)), start = Math.max(0, span - (count*t + (count - 1)*gapL))/2;
+    if ($('genShowFins').checked){
+      // Gaps read as shadow; each fin's top edge catches a little light.
+      var pxPer = alongX ? cw/p.W : ch/p.H, fill = function(a, b, c){ x.fillStyle = c; if (alongX) x.fillRect(a*pxPer, 0, (b - a)*pxPer, ch); else x.fillRect(0, ch - b*pxPer, cw, (b - a)*pxPer); };
+      if (start > 0) fill(0, start, 'rgba(12,10,8,.62)');
+      for (var f=0; f<count; f++){
+        var a0 = start + f*pitch, a1 = a0 + t;
+        fill(a1, Math.min(span, a1 + gapL), 'rgba(12,10,8,.62)');
+        if (t*pxPer > 2.5) fill(a0, a0 + Math.min(t*0.25, 1.2/pxPer + 0.01), 'rgba(255,245,225,.18)');
+      }
+    }
+    $('artInfo').textContent = p.W + ' × ' + p.H + ' × ' + (p.base + p.depth) + ' mm · ' + count + ' fins of ' + t + ' mm · ' + $('genType').selectedOptions[0].textContent.toLowerCase() + ', seed ' + p.seed;
+  }
+  function artPreview(){
+    if (!$('app').classList.contains('art')) return;
+    var p = genParams(), g;
+    try { g = genRelief(p); } catch(e){ toast('Could not generate: ' + (e.message || e)); return; }
+    artLast = { p: p, g: g };
+    drawGenPreview(g.grid, p);
+  }
+  function artSoon(){ clearTimeout(artTimer); artTimer = setTimeout(artPreview, 120); }
+  document.querySelectorAll('[data-art] input, [data-art] select').forEach(function(el){ el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', artSoon); });
+  new ResizeObserver(function(){ if (artLast && $('app').classList.contains('art')) drawGenPreview(artLast.g.grid, artLast.p); }).observe($('vart'));
+  function setMode(m){
+    $('app').classList.toggle('art', m === 'art');
+    var r = document.querySelector('input[name="appmode"][value="' + m + '"]'); if (r) r.checked = true;
+    try { localStorage.setItem('3d2cnc-mode', m); } catch(e){}
+    if (m === 'art') artPreview(); else resize();
+  }
+  document.querySelectorAll('input[name="appmode"]').forEach(function(r){ r.addEventListener('change', function(){ setMode(r.value); }); });
+  $('genPrevSeed').addEventListener('click', function(){ $('genSeed').value = Math.max(1, Math.round(num('genSeed', 1)) - 1); artPreview(); });
+  $('genNextSeed').addEventListener('click', function(){ $('genSeed').value = Math.round(num('genSeed', 1)) + 1; artPreview(); });
+  $('genRand').addEventListener('click', function(){
+    $('genType').value = GEN_TYPES[Math.floor(Math.random()*GEN_TYPES.length)];
+    $('genSeed').value = 1 + Math.floor(Math.random()*99999);
+    $('genDetail').value = 3 + Math.floor(Math.random()*5);
+    artPreview();
+  });
+  // Hand the panel to the slicer: stacked fins with the chosen stock, gap and direction.
+  $('genGo').addEventListener('click', function(){
+    var p = genParams(), g = artLast && JSON.stringify(artLast.p) === JSON.stringify(p) ? artLast.g : genRelief(p);
+    setRadio('method', 'stack'); $('stackAxis').value = $('genDir').value; $('stackGap').value = $('genGap').value;
+    $('thick').value = Math.max(1, num('genThick', 6)); $('fitAxis').value = 'file';
+    state.sampleKey = null; state.genParams = p;
+    clearMoves(); setMode('slicer'); setStep('design'); syncVisibility();
+    loadRaw(g, p.type + '_' + p.seed);
+    toast('Sliced ' + $('genType').selectedOptions[0].textContent.toLowerCase() + ', seed ' + p.seed + ', into fins.');
+  });
+
   // ---------- inputs ----------
   function loadFile(f){
     if (!f) return;
@@ -2144,7 +3084,7 @@ function sampleIsland(){
       try {
         var parsed = ext === '3mf' ? await parse3MF(rd.result) : ext === 'obj' ? parseOBJ(new TextDecoder().decode(new Uint8Array(rd.result))) : parseSTL(rd.result);
         $('fitAxis').value = 'file'; syncVisibility();
-        state.sampleKey = null;
+        state.sampleKey = null; state.genParams = null;
         loadRaw(parsed, f.name.replace(/\.[^.]+$/, ''));
         var nb = state.raw.bodies.length;
         toast('Loaded ' + f.name + ' at file size' + (nb > 1 ? ' · ' + nb + ' bodies found' : '') + '.');
@@ -2163,20 +3103,29 @@ function sampleIsland(){
     island: { fn: sampleIsland, fit: '0', size: 300, method: 'interlock' },
     pot: { fn: samplePot, fit: 'file', size: 120, method: 'radial', roles: ['slice', 'keepcut'] },
     blob: { fn: sampleBlob, fit: '0', size: 260, method: 'interlock' },
-    vase: { fn: sampleVase, fit: '2', size: 240, method: 'interlock' }
+    vase: { fn: sampleVase, fit: '2', size: 240, method: 'interlock' },
+    wave: { fn: sampleWave, fit: 'file', size: 600, method: 'stack', set: { stackAxis: '0', stackGap: '1' } }
   };
   function loadSample(key){
-    var s = samples[key]; $('fitAxis').value = s.fit; $('fitVal').value = s.size; setRadio('method', s.method); syncVisibility();
-    state.sampleKey = key;
+    var s = samples[key]; $('fitAxis').value = s.fit; $('fitVal').value = s.size; setRadio('method', s.method);
+    if (s.set) Object.keys(s.set).forEach(function(id){ $(id).value = s.set[id]; });
+    syncVisibility();
+    state.sampleKey = key; state.genParams = null;
     loadRaw(s.fn(), key, s.roles);
   }
   $('sample').addEventListener('change', function(){ loadSample($('sample').value); });
   document.querySelectorAll('[data-rot]').forEach(function(b){ b.addEventListener('click', function(){ if (!state.raw) return; state.R = matMul(rot90(b.getAttribute('data-rot')), state.R); remesh(true); }); });
   ['fitAxis', 'fitVal'].forEach(function(id){ $(id).addEventListener('change', function(){ syncVisibility(); if (state.raw) remesh(true); }); });
   document.querySelectorAll('.rail input, .rail select').forEach(function(el){
-    if (['file','projFile','sample','fitAxis','fitVal'].indexOf(el.id) >= 0 || el.name === 'theme') return;
+    if (['file','projFile','sample','fitAxis','fitVal','shareUrl'].indexOf(el.id) >= 0 || el.name === 'theme' || el.name === 'wstep') return;
+    if (el.id === 'nestMethod' || el.id === 'nestTime'){ el.addEventListener('change', syncVisibility); return; }
+    if (el.id.indexOf('gen') === 0) return;
+    if (['sheetW','sheetH','margin','gap','nestRot','nestKeep','grain','offcuts','nestSettle','nestRes','nestHoles','sheetLine'].indexOf(el.id) >= 0){
+      el.addEventListener(el.type === 'number' ? 'input' : 'change', function(){ if (el.id === 'sheetLine' && state.layout){ renderSheets(state.layout); return; } invalidateNest(false); });
+      return;
+    }
     el.addEventListener(el.type === 'number' ? 'input' : 'change', function(){
-      if (['countA','countB','fins','rings','pair','stackAxis','spacing','spacingD','gridAngle','halfOn','halfAxis','halfKeep','halfPos'].indexOf(el.id) >= 0 || el.name === 'method'){ if (clearMoves()) toast('Panel moves were reset because the slice layout changed.'); }
+      if (['countA','countB','fins','rings','pair','stackAxis','stackGap','stackGapMm','spacing','spacingD','gridAngle','halfOn','halfAxis','halfKeep','halfPos'].indexOf(el.id) >= 0 || el.name === 'method'){ if (clearMoves()) toast('Panel moves were reset because the slice layout changed.'); }
       syncVisibility(); legend(); schedule();
     });
   });
@@ -2187,12 +3136,16 @@ function sampleIsland(){
     if (b.id === 't3d') resize();
   }); });
 
-  histUI();
+  histUI(); state.nestStale = false;
+  (function(){ var st = 'design'; try { st = localStorage.getItem('3d2cnc-step') || 'design'; } catch(e){} setStep(st === 'export' ? 'export' : 'design'); })();
   if (typeof ClipperLib === 'undefined'){ toast('The geometry library failed to load. Check your connection and reload.'); return; }
   syncVisibility(); resize();
-  loadSample('island');
+  openSharedLink().then(function(ok){
+    if (!ok) loadSample('island');
+    var md = 'slicer'; try { md = localStorage.getItem('3d2cnc-mode') || 'slicer'; } catch(e){}
+    setMode(ok ? 'slicer' : md);
+  });
 })();
 </script>
 
-</body>
 </html>
