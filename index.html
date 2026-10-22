@@ -462,11 +462,13 @@ tbody tr:hover td{background:color-mix(in srgb,var(--accent) 8%,transparent)}
         <span class="join-only hint" id="moveInfo">Drag a panel to move it</span>
         <button class="btn" id="snapMin" type="button" hidden>To floor</button>
         <button class="btn" id="snapMax" type="button" hidden>To top</button>
-        <button class="btn join-only" id="undoBtn" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button>
-        <button class="btn join-only" id="redoBtn" type="button" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
+        <button class="btn undo-only" id="undoBtn" type="button" title="Undo (Ctrl+Z)" disabled>Undo</button>
+        <button class="btn undo-only" id="redoBtn" type="button" title="Redo (Ctrl+Shift+Z)" disabled>Redo</button>
         <button class="btn" id="addPanel" type="button" hidden>Add panel</button>
         <button class="btn" id="delPanel" type="button" hidden>Delete panel</button>
         <button class="btn join-only" id="resetMoves" type="button" hidden>Reset layout</button>
+        <button class="btn" id="dowelEdit" type="button" hidden aria-pressed="false">Edit dowels</button>
+        <button class="btn" id="dowelReset" type="button" hidden>Reset dowels</button>
       </div>
     </div>
     <div class="view" id="vsheets" hidden></div>
@@ -973,66 +975,115 @@ function buildParts(model, o){
       });
     }
     if ((o.dowels || finMode) && L.length > 1){
-      // Long through-dowels. Map every grid point: which layers it lies inside (silhouette, hollows included) and which
-      // it can be drilled through (solid material with clearance). A dowel runs through a contiguous stack of layers
-      // at one point. Greedily pick the dowel that drills the most layers still needing holes, nearest the middle,
-      // until every drillable layer has its target count. Hidden ends stop a layer short of any exposed face.
-      var dd = o.dowelD + o.clear, Lc = L.length, target = o.dowelN;
-      var Vp = L.map(function(P){ return P.region.length ? offsetPaths(P.region, -(dd/2 + 1.2)) : []; });
+      // Long through-dowels, planned per piece: a layer can be cut into several separate pieces (a body, a tail, two
+      // wings), and every piece needs its own holes. Each grid point gives runs of consecutive layers it sits inside;
+      // a dowel at that point drills every piece along the run. Dowels are picked greedily, the one that holds the most
+      // pieces still short of holes first, then the longest (so existing dowels are extended through more layers rather
+      // than new ones added), then the most central. Manual additions go in first; removed spots are kept clear.
+      var dd = o.dowelD + o.clear, Lc = L.length, target = o.dowelN, minPiece = Math.max(4, o.minSize*o.minSize);
+      var dEd = o.dowelEdits || { added: [], removed: [] };
       var Sp = L.map(function(P){ var outers = P.region.filter(function(pth){ return CL.Clipper.Orientation(pth); }); return outers.length ? offsetPaths(clipOp(outers, null, CL.ClipType.ctUnion), -(dd/2 + 0.5)) : []; });
       var allB = pathsBox([].concat.apply([], L.map(function(P){ return P.region; })));
-      var gW = allB[2] - allB[0], gH = allB[3] - allB[1], step = Math.max(1.5, Math.max(gW, gH)/90);
+      var gW = allB[2] - allB[0], gH = allB[3] - allB[1], step = Math.max(1.5, Math.min(dd*0.6, Math.max(gW, gH)/120));
+      while ((gW/step)*(gH/step) > 60000) step *= 1.2;
       var cols = Math.max(1, Math.floor(gW/step)), rows = Math.max(1, Math.floor(gH/step)), NC = cols*rows;
       var cx0 = allB[0] + (gW - (cols-1)*step)/2, cy0 = allB[1] + (gH - (rows-1)*step)/2;
       var swapP = function(paths){ return paths.map(function(pth){ return pth.map(function(q){ return { X: q.Y, Y: q.X }; }); }); };
-      var raster = function(paths){
-        var m = new Uint8Array(NC); if (!paths.length) return m; var sw = swapP(paths);
-        for (var r=0; r<rows; r++){ var y = cy0 + r*step; intervals(sw, y).forEach(function(iv){ var c0 = Math.max(0, Math.ceil((iv[0] - cx0)/step)), c1 = Math.min(cols-1, Math.floor((iv[1] - cx0)/step)); for (var c=c0; c<=c1; c++) m[r*cols + c] = 1; }); }
-        return m;
+      // Calls fn(cell) for every grid point inside the paths (only the rows the paths span).
+      var rasterEach = function(paths, fn){
+        if (!paths.length) return; var b = pathsBox(paths), sw = swapP(paths);
+        var r0 = Math.max(0, Math.ceil((b[1] - cy0)/step)), r1 = Math.min(rows - 1, Math.floor((b[3] - cy0)/step));
+        for (var r=r0; r<=r1; r++){ var y = cy0 + r*step; intervals(sw, y).forEach(function(iv){ var c0 = Math.max(0, Math.ceil((iv[0] - cx0)/step)), c1 = Math.min(cols-1, Math.floor((iv[1] - cx0)/step)); for (var c=c0; c<=c1; c++) fn(r*cols + c); }); }
       };
-      var Vm = Vp.map(raster), Sm = Sp.map(raster);
-      var runs = [], cnt = 0, sx = 0, sy = 0, drillable = new Array(Lc).fill(false);
+      var Sm = Sp.map(function(paths){ var m = new Uint8Array(NC); rasterEach(paths, function(c){ m[c] = 1; }); return m; });
+      // Pieces and where each can be drilled (solid material with clearance round the hole).
+      var pieces = [], pieceAt = L.map(function(P, li){
+        var pm = new Int32Array(NC).fill(-1); if (!P.region.length) return pm;
+        var polys = splitPolys(P.region).filter(function(poly){ return pathsArea(poly) >= minPiece; })
+          .map(function(poly){ return { poly: poly, b: pathsBox(poly) }; }).sort(function(a, b){ return a.b[0] - b.b[0]; });
+        polys.forEach(function(e, k){
+          var id = pieces.length, n = 0;
+          rasterEach(offsetPaths(e.poly, -(dd/2 + 1.2)), function(c){ pm[c] = id; n++; });
+          pieces.push({ layer: li, name: P.name + (polys.length > 1 ? String.fromCharCode(97 + k) : ''), size: Math.min(e.b[2] - e.b[0], e.b[3] - e.b[1]), cells: n, holes: [], need: n ? target : 0 });
+        });
+        return pm;
+      });
+      var dims = pieces.map(function(pc){ return pc.size; }).sort(function(x, y){ return x - y; }), medDim = dims[Math.floor(dims.length/2)] || 0;
+      // Two holes in one piece must be far enough apart to stop it turning, scaled down for small pieces.
+      var spOf = function(pc){ return Math.max(2.5*dd, Math.min(Math.max(3*dd, 15, 0.2*medDim), 0.45*pc.size)); }, hardSp = 2*dd + 2;
+      // Candidate dowels: one per run of consecutive layers at each grid point.
+      var cands = [], cnt = 0, sx = 0, sy = 0;
+      var runAt = function(cell, li){
+        if (!Sm[li][cell]) return null;
+        var ra = li, rb = li; while (ra > 0 && Sm[ra-1][cell]) ra--; while (rb < Lc - 1 && Sm[rb+1][cell]) rb++;
+        var lo = ra, hi = rb; if (o.dowelHide && !finMode){ hi = rb - 1; if (ra > 0) lo = ra + 1; }
+        var idx = []; for (var j=lo; j<=hi; j++) if (pieceAt[j][cell] >= 0) idx.push(j);
+        return idx.length ? { cell: cell, x: cx0 + (cell % cols)*step, y: cy0 + Math.floor(cell/cols)*step, idx: idx, a0: idx[0], a1: idx[idx.length - 1], ra: ra, rb: rb } : null;
+      };
       for (var cell=0; cell<NC; cell++){
-        var px = cx0 + (cell % cols)*step, py = cy0 + Math.floor(cell/cols)*step, li = 0, cr = [];
+        var li = 0;
         while (li < Lc){
           if (!Sm[li][cell]){ li++; continue; }
-          var ra = li; while (li < Lc && Sm[li][cell]) li++; var rb = li - 1;
-          cnt += rb - ra + 1; sx += px*(rb - ra + 1); sy += py*(rb - ra + 1);
-          var lo = ra, hi = rb;
-          if (o.dowelHide && !finMode){ hi = rb - 1; if (ra > 0) lo = ra + 1; }
-          var idx = []; for (var j=lo; j<=hi; j++) if (Vm[j][cell]) idx.push(j);
-          if (idx.length){ cr.push(idx); idx.forEach(function(j){ drillable[j] = true; }); }
+          var cd = runAt(cell, li), rbb = li; while (rbb < Lc && Sm[rbb][cell]) rbb++;
+          if (cd){ cands.push(cd); cnt += cd.idx.length; sx += cd.x*cd.idx.length; sy += cd.y*cd.idx.length; }
+          li = rbb;
         }
-        runs.push(cr);
       }
       var mcx = cnt ? sx/cnt : (allB[0] + allB[2])/2, mcy = cnt ? sy/cnt : (allB[1] + allB[3])/2;
-      var dims = L.filter(function(P){ return P.region.length; }).map(function(P){ var b = pathsBox(P.region); return Math.min(b[2]-b[0], b[3]-b[1]); }).sort(function(x, y){ return x - y; });
-      // Dowels sharing layers must be far enough apart to stop the layers rotating: 20% of a typical layer's width.
-      var need = drillable.map(function(d){ return d ? target : 0; }), chosen = [], minSp = Math.max(3*dd, 15, 0.2*(dims[Math.floor(dims.length/2)] || 0));
-      for (var it=0; it<60 && need.some(function(v){ return v > 0; }); it++){
-        var best = null;
-        for (var c2=0; c2<NC; c2++){
-          var rs = runs[c2]; if (!rs.length) continue;
-          var qx = cx0 + (c2 % cols)*step, qy = cy0 + Math.floor(c2/cols)*step, dc = Math.hypot(qx - mcx, qy - mcy);
-          for (var k=0; k<rs.length; k++){
-            var idxs = rs[k], gain = 0;
-            for (var q=0; q<idxs.length; q++) if (need[idxs[q]] > 0) gain++;
-            if (!gain) continue;
-            var a0 = idxs[0], a1 = idxs[idxs.length-1];
-            if (chosen.some(function(d){ return d.a1 >= a0 && d.a0 <= a1 && Math.hypot(d.x - qx, d.y - qy) < minSp; })) continue;
-            var score = gain*1e6 + idxs.length*1e3 - dc;
-            if (!best || score > best.score) best = { score: score, x: qx, y: qy, idx: idxs, a0: a0, a1: a1 };
-          }
+      var banned = function(cd){ return dEd.removed.some(function(r){ return r.li >= cd.ra && r.li <= cd.rb && Math.hypot(r.x - cd.x, r.y - cd.y) < Math.max(3*dd, 20, 2*step); }); };
+      // Score: pieces it newly holds, then length, then centrality. -1 means it cannot go there at all.
+      var evalCand = function(cd){
+        var gain = 0;
+        for (var q=0; q<cd.idx.length; q++){
+          var pc = pieces[pieceAt[cd.idx[q]][cd.cell]], md = Infinity;
+          for (var h=0; h<pc.holes.length; h++){ var dh = Math.hypot(pc.holes[h][0] - cd.x, pc.holes[h][1] - cd.y); if (dh < md) md = dh; }
+          if (md < hardSp) return -1;
+          if (pc.need > 0 && md >= spOf(pc)) gain++;
         }
-        if (!best) break;
-        best.idx.forEach(function(j){ need[j]--; });
-        chosen.push(best);
+        return gain ? gain*1e6 + cd.idx.length*1e3 - Math.min(999, Math.hypot(cd.x - mcx, cd.y - mcy)) : -1;
+      };
+      var chosen = [];
+      var take = function(cd, manual){
+        cd.idx.forEach(function(j){ var pc = pieces[pieceAt[j][cd.cell]]; pc.holes.push([cd.x, cd.y]); pc.need--; });
+        cd.manual = !!manual; chosen.push(cd);
+      };
+      // Manual dowels: snap to the nearest grid point that can be drilled on the clicked layer.
+      var missed = [];
+      dEd.added.forEach(function(a){
+        if (a.li < 0 || a.li >= Lc){ return; }
+        var best = null, c0 = Math.round((a.x - cx0)/step), r0 = Math.round((a.y - cy0)/step), R = Math.max(2, Math.ceil(dd/step) + 2);
+        for (var dr=-R; dr<=R; dr++) for (var dc=-R; dc<=R; dc++){
+          var c = c0 + dc, r = r0 + dr; if (c < 0 || r < 0 || c >= cols || r >= rows) continue;
+          var cell2 = r*cols + c; if (pieceAt[a.li][cell2] < 0) continue;
+          var dist = Math.hypot(dc, dr); if (!best || dist < best.d) best = { d: dist, cell: cell2 };
+        }
+        var cd2 = best && runAt(best.cell, a.li);
+        if (cd2) take(cd2, true); else missed.push(L[a.li].name);
+      });
+      if (missed.length) warnings.push('No room for a dowel where you clicked on ' + missed.join(', ') + '. Click nearer the middle of the piece.');
+      // Lazy greedy: scores only fall as pieces fill, so re-check the top candidate and keep it if it still leads.
+      var heap = [];
+      var hpush = function(e){ heap.push(e); var i = heap.length - 1; while (i){ var p = (i - 1) >> 1; if (heap[p].s >= heap[i].s) break; var tmp = heap[p]; heap[p] = heap[i]; heap[i] = tmp; i = p; } };
+      var hpop = function(){ var top = heap[0], last = heap.pop(); if (heap.length){ heap[0] = last; var i = 0; for (;;){ var l = 2*i + 1, r = l + 1, m = i; if (l < heap.length && heap[l].s > heap[m].s) m = l; if (r < heap.length && heap[r].s > heap[m].s) m = r; if (m === i) break; var tmp = heap[m]; heap[m] = heap[i]; heap[i] = tmp; i = m; } } return top; };
+      cands.forEach(function(cd){ if (banned(cd)) return; var s = evalCand(cd); if (s > 0) hpush({ s: s, cd: cd }); });
+      while (heap.length && chosen.length < 600){
+        var top = hpop(), s2 = evalCand(top.cd);
+        if (s2 <= 0) continue;
+        if (heap.length && s2 < heap[0].s){ top.s = s2; hpush(top); continue; }
+        take(top.cd, false);
       }
+      // Drop automatic dowels made redundant by longer ones picked later: every piece they drill keeps its holes without them.
+      chosen.slice().filter(function(d){ return !d.manual; }).sort(function(a, b){ return a.idx.length - b.idx.length; }).forEach(function(d){
+        var spare = d.idx.every(function(j){ return pieces[pieceAt[j][d.cell]].holes.length > target; });
+        if (!spare) return;
+        d.idx.forEach(function(j){ var pc = pieces[pieceAt[j][d.cell]]; for (var h=0; h<pc.holes.length; h++) if (pc.holes[h][0] === d.x && pc.holes[h][1] === d.y){ pc.holes.splice(h, 1); break; } });
+        chosen.splice(chosen.indexOf(d), 1);
+      });
       var dowelList = chosen.map(function(d, k){
         d.idx.forEach(function(j){ L[j].cuts.push(posPath(circleUV(d.x, d.y, dd/2))); });
         var F0 = L[d.a0].F, F1 = L[d.a1].F, base = add(F0.O, add(scl(F0.eu, d.x), scl(F0.ev, d.y)));
         var z0 = dot(F0.O, F0.en) - t/2, z1 = dot(F1.O, F1.en) + t/2;
-        return { name: 'D' + (k+1), x: d.x, y: d.y, from: L[d.a0].name, to: L[d.a1].name, drilled: d.idx.length, len: z1 - z0,
+        return { name: 'D' + (k+1), x: d.x, y: d.y, li0: d.a0, li1: d.a1, manual: d.manual, from: L[d.a0].name, to: L[d.a1].name, drilled: d.idx.length, len: z1 - z0,
           p0: add(base, scl(F0.en, -t/2)), p1: add(base, scl(F0.en, z1 - z0 - t/2)), dia: o.dowelD };
       });
       model.dowelsOut = dowelList;
@@ -1050,13 +1101,13 @@ function buildParts(model, o){
           }
         });
       }
-      var short = L.filter(function(P, j){ return drillable[j] && need[j] > 0; }).map(function(P){ return P.name; });
-      var undrill = L.filter(function(P, j){ return !drillable[j] && P.region.length; }).map(function(P){ return P.name; });
       var listNames = function(a){ return a.slice(0, 8).join(', ') + (a.length > 8 ? ' and ' + (a.length - 8) + ' more' : ''); };
-      if (short.length) warnings.push('Only one dowel could be fitted through ' + listNames(short) + '.');
-      if (undrill.length) warnings.push(o.hollow && o.wall < dd + 2.4 ? 'Walls of ' + o.wall + ' mm are too thin for ' + o.dowelD + ' mm dowels; use walls of at least ' + Math.ceil(dd + 3) + ' mm or thinner dowels.'
-        : finMode ? listNames(undrill) + (undrill.length > 1 ? ' have' : ' has') + ' no room for a dowel, so ' + (undrill.length > 1 ? 'they' : 'it') + ' would not be held. Use thinner dowels, a different layer axis or a larger model.'
-        : (o.dowelHide ? listNames(undrill) + (undrill.length > 1 ? ' are' : ' is') + ' not drilled, so the dowel ends stay hidden. Line ' + (undrill.length > 1 ? 'these' : 'it') + ' up by the engraved outline, or turn off hidden dowel ends.' : 'No dowel can reach ' + listNames(undrill) + '.'));
+      var none = pieces.filter(function(pc){ return !pc.holes.length; }).map(function(pc){ return pc.name; });
+      var one = pieces.filter(function(pc){ return pc.holes.length === 1 && target > 1; }).map(function(pc){ return pc.name; });
+      if (one.length) warnings.push(listNames(one) + (one.length > 1 ? ' are' : ' is') + ' held by one dowel only' + (finMode ? ', so ' + (one.length > 1 ? 'they' : 'it') + ' can turn on it. Glue ' + (one.length > 1 ? 'them' : 'it') + ' to a washer or add a dowel by hand.' : '; the engraved outline keeps ' + (one.length > 1 ? 'them' : 'it') + ' lined up.'));
+      if (none.length) warnings.push(o.hollow && o.wall < dd + 2.4 ? 'Walls of ' + o.wall + ' mm are too thin for ' + o.dowelD + ' mm dowels; use walls of at least ' + Math.ceil(dd + 3) + ' mm or thinner dowels.'
+        : finMode ? listNames(none) + (none.length > 1 ? ' have' : ' has') + ' no dowel, so ' + (none.length > 1 ? 'they' : 'it') + ' would not be held. Add a dowel by hand, use thinner dowels or a larger model.'
+        : (o.dowelHide ? listNames(none) + (none.length > 1 ? ' have' : ' has') + ' no dowel (some are kept clear so the dowel ends stay hidden). Line ' + (none.length > 1 ? 'these' : 'it') + ' up by the engraved outline, add a dowel by hand, or turn off hidden dowel ends.' : 'No dowel can reach ' + listNames(none) + '.'));
     }
   }
   bots.forEach(function(P){ P.liftDir = refDir(P); });
@@ -2142,7 +2193,7 @@ function genRelief(p){
 <script>
 (function(){
   var $ = function(id){ return document.getElementById(id); };
-  var state = { moves: {}, edits: { deleted: [], added: [] }, sampleKey: 'island', preview: null, raw: null, R: [1,0,0,0,1,0,0,0,1], roles: [], model: null, result: null, layout: null, sel: null, name: 'island' };
+  var state = { moves: {}, edits: { deleted: [], added: [] }, dowelEdits: { added: [], removed: [] }, sampleKey: 'island', preview: null, raw: null, R: [1,0,0,0,1,0,0,0,1], roles: [], model: null, result: null, layout: null, sel: null, name: 'island' };
   // Colour theme: auto follows the system; light/dark pin it. Remembered per browser.
   function applyTheme(v){ if (v === 'light' || v === 'dark') document.documentElement.setAttribute('data-theme', v); else document.documentElement.removeAttribute('data-theme'); }
   (function(){
@@ -2204,7 +2255,7 @@ function genRelief(p){
       dowels: $('dowels').checked, dowelD: Math.max(1, num('dowelD', 6)), dowelN: Math.max(1, Math.min(3, Math.round(num('dowelN', 2)))), dowelHide: $('dowelHide').checked,
       fitTest: $('fitTest').checked, fitFrom: num('fitFrom', -0.1), fitStep: Math.max(0.01, num('fitStep', 0.1)), fitCount: Math.max(1, Math.min(12, Math.round(num('fitCount', 6)))),
       tabs: false, tabStyle: 'markers', tabW: 6, tabSpacing: 150,
-      edits: state.edits,
+      edits: state.edits, dowelEdits: state.dowelEdits,
       gridAngle: Math.max(-90, Math.min(90, num('gridAngle', 0))), spacing: $('spacing').value, spacingD: Math.max(5, num('spacingD', 40)),
       baseOn: $('baseOn').checked, baseShape: $('baseShape').value, baseMargin: Math.max(0, num('baseMargin', 10)), plateTab: Math.max(4, num('plateTab', 20)),
       halfOn: $('halfOn').checked, halfAxis: +$('halfAxis').value, halfPos: num('halfPos', 0), halfKeep: +$('halfKeep').value,
@@ -2221,6 +2272,7 @@ function genRelief(p){
     show('.crate-only', o.method === 'interlock'); show('.rad-only', o.method === 'radial'); show('.stk-only', o.method === 'stack');
     show('.join-only', o.method !== 'stack'); show('.deep-only', o.nestMethod === 'deep');
     var fins = o.method === 'stack' && o.stackGap !== '0';
+    show('.undo-only', o.method !== 'stack' || o.dowels || fins);
     show('.fins-only', fins); show('.gapc-only', fins && o.stackGap === 'c'); show('.washer-only', fins && o.washers); show('.nofins-only', !fins);
     show('.lighten-only', o.method !== 'stack' && o.lighten); show('.hollow-only', o.method === 'stack' && o.hollow); show('.dowel-only', o.method === 'stack' && (o.dowels || fins));
     if (state.model && state.model.bodies.length > 1) $('lockRow').hidden = state.roles.indexOf('keepcut') < 0 || o.method === 'stack';
@@ -2294,12 +2346,17 @@ function genRelief(p){
     if (!has3D) return;
     hitSet = {}; (res.collisions || []).forEach(function(c){ hitSet[c[0]] = hitSet[c[1]] = true; });
     clearGroup(partsGrp); meshes = {}; clearGroup(dowelGrp);
-    var dmat = new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.6 });
+    var dmat = new THREE.MeshStandardMaterial({ color: 0x8a5a2b, roughness: 0.6 }), dmatMan = new THREE.MeshStandardMaterial({ color: 0x2f9e6e, roughness: 0.5, emissive: 0x0b2a1c });
+    var pickMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+    var mm = state.model, pickR = mm ? Math.max(mm.max[0]-mm.min[0], mm.max[1]-mm.min[1], mm.max[2]-mm.min[2])*0.012 : 3;
     (res.dowels || []).forEach(function(d){
       var a = new THREE.Vector3().fromArray(d.p0), b = new THREE.Vector3().fromArray(d.p1), len = a.distanceTo(b);
-      var m = new THREE.Mesh(new THREE.CylinderGeometry(d.dia/2, d.dia/2, len, 18), dmat);
+      var m = new THREE.Mesh(new THREE.CylinderGeometry(d.dia/2, d.dia/2, len, 18), d.manual ? dmatMan : dmat);
       m.position.copy(a).add(b).multiplyScalar(0.5);
       m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+      // A fatter invisible copy makes thin dowels easy to click.
+      var pk = new THREE.Mesh(new THREE.CylinderGeometry(Math.max(d.dia/2, pickR), Math.max(d.dia/2, pickR), len, 10), pickMat);
+      pk.userData = { dowel: d }; m.add(pk); m.userData = { dowel: d };
       dowelGrp.add(m);
     });
     if (!mats){
@@ -2384,6 +2441,10 @@ function genRelief(p){
     Object.keys(meshes).forEach(function(k){
       var cur = stepping && steps[stepIdx] && meshes[k].userData.panel.name === steps[stepIdx].name;
       meshes[k].material = cur ? matStep : k === state.sel ? matSel : meshes[k].userData.base;
+      if (dowelEditing && !cur){
+        var bm = meshes[k].material; if (!bm.userData.glass){ bm.userData.glass = bm.clone(); bm.userData.glass.transparent = true; bm.userData.glass.opacity = 0.32; bm.userData.glass.depthWrite = false; }
+        meshes[k].material = bm.userData.glass;
+      }
     });
     document.querySelectorAll('#vsheets .part').forEach(function(e){ var on = e.getAttribute('data-part') === state.sel; e.setAttribute('stroke', on ? 'var(--sel)' : 'var(--ply-edge)'); e.setAttribute('stroke-width', on ? '2.5' : '0.6'); });
     document.querySelectorAll('#vparts tbody tr').forEach(function(tr){ tr.classList.toggle('sel', tr.getAttribute('data-part') === state.sel); });
@@ -2423,10 +2484,10 @@ function genRelief(p){
   $('snapMax').addEventListener('click', function(){ snapTo(1); });
   // Undo / redo over panel moves, additions and deletions.
   var hist = [], fut = [];
-  function layoutSnap(){ return JSON.stringify({ moves: state.moves, edits: state.edits }); }
+  function layoutSnap(){ return JSON.stringify({ moves: state.moves, edits: state.edits, dowelEdits: state.dowelEdits }); }
   function histUI(){ $('undoBtn').disabled = !hist.length; $('redoBtn').disabled = !fut.length; }
   function pushHist(){ hist.push(layoutSnap()); if (hist.length > 80) hist.shift(); fut = []; histUI(); }
-  function restoreSnap(sn){ var d = JSON.parse(sn); state.moves = d.moves; state.edits = d.edits; state.preview = null; recompute(); }
+  function restoreSnap(sn){ var d = JSON.parse(sn); state.moves = d.moves; state.edits = d.edits; state.dowelEdits = d.dowelEdits || { added: [], removed: [] }; state.preview = null; recompute(); }
   function undo(){ if (!hist.length) return; fut.push(layoutSnap()); restoreSnap(hist.pop()); histUI(); }
   function redo(){ if (!fut.length) return; hist.push(layoutSnap()); restoreSnap(fut.pop()); histUI(); }
   $('undoBtn').addEventListener('click', undo);
@@ -2467,6 +2528,37 @@ function genRelief(p){
   }
   $('addPanel').addEventListener('click', addPanel);
   $('delPanel').addEventListener('click', deletePanel);
+  // Dowel editing (stacked layers): click a dowel to remove it, click a layer to add one through that spot.
+  var dowelEditing = false;
+  function dowelUI(){
+    var o = opts(), ok = o.method === 'stack' && (o.dowels || o.stackGap !== '0') && !!(state.result && state.result.panels);
+    if (!ok && dowelEditing){ dowelEditing = false; applySel(); }
+    var b = $('dowelEdit'); b.hidden = !ok; b.textContent = dowelEditing ? 'Done editing dowels' : 'Edit dowels'; b.setAttribute('aria-pressed', dowelEditing ? 'true' : 'false');
+    b.classList.toggle('primary', dowelEditing);
+    $('dowelReset').hidden = !ok || !(state.dowelEdits.added.length + state.dowelEdits.removed.length);
+  }
+  $('dowelEdit').addEventListener('click', function(){
+    dowelEditing = !dowelEditing; applySel(); dowelUI();
+    if (dowelEditing) toast('Click a dowel to remove it, or click a layer to add a dowel through that spot.');
+  });
+  $('dowelReset').addEventListener('click', function(){ pushHist(); state.dowelEdits = { added: [], removed: [] }; recompute(); toast('Dowels returned to the automatic layout. Undo brings your edits back.'); });
+  function applyDowelEdit(ed){
+    var de = state.dowelEdits;
+    pushHist();
+    if (ed.type === 'del'){
+      var d = ed.d;
+      if (d.manual){
+        var bi = -1, bd = Infinity;
+        de.added.forEach(function(a, i){ if (a.li < d.li0 - 1 || a.li > d.li1 + 1) return; var dist = Math.hypot(a.x - d.x, a.y - d.y); if (dist < bd){ bd = dist; bi = i; } });
+        if (bi >= 0) de.added.splice(bi, 1);
+      } else de.removed.push({ x: Math.round(d.x*10)/10, y: Math.round(d.y*10)/10, li: Math.round((d.li0 + d.li1)/2) });
+      toast('Removed dowel ' + d.name + (d.manual ? '.' : '. The automatic layout keeps clear of that spot.'));
+    } else {
+      de.added.push({ x: Math.round(ed.x*10)/10, y: Math.round(ed.y*10)/10, li: ed.li });
+      toast('Added a dowel through ' + ed.name + ', running through every layer it can reach from there.');
+    }
+    recompute();
+  }
   if (has3D){
     var ray = new THREE.Raycaster(), drag = null;
     var ndc = function(e){ var r = cv.getBoundingClientRect(); return new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1); };
@@ -2484,6 +2576,20 @@ function genRelief(p){
     };
     cv.addEventListener('pointerdown', function(e){
       if (e.button !== 0 || !state.result) return;
+      if (dowelEditing){
+        ray.setFromCamera(ndc(e), camera); root.updateMatrixWorld(true);
+        var dh = ray.intersectObjects(dowelGrp.children, true).filter(function(h){ return h.object.userData.dowel; });
+        var ph = ray.intersectObjects(partsGrp.children, false).filter(function(h){ return h.object.userData.panel && h.object.userData.panel.fam === 'L'; });
+        var ed = null;
+        if (dh.length) ed = { type: 'del', d: dh[0].object.userData.dowel };
+        else if (ph.length){
+          var LP = ph[0].object.userData.panel, lp = ph[0].point.clone().applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert());
+          var rel = [lp.x - LP.F.O[0], lp.y - LP.F.O[1], lp.z - LP.F.O[2]];
+          ed = { type: 'add', x: dot(rel, LP.F.eu), y: dot(rel, LP.F.ev), li: state.result.panels.filter(function(q){ return q.fam === 'L'; }).indexOf(LP), name: ph[0].object.userData.partName };
+        }
+        drag = { x: e.clientX, y: e.clientY, moved: false, edit: ed };
+        return;
+      }
       ray.setFromCamera(ndc(e), camera); root.updateMatrixWorld(true);
       var hits = ray.intersectObjects(partsGrp.children, false);
       if (!hits.length) return;
@@ -2518,10 +2624,11 @@ function genRelief(p){
       state.preview = { name: drag.name, mode: drag.mode, value: dv, base: state.moves[drag.name] || 0 };
       applyLift(); moveUI();
     });
-    var endDrag = function(){
+    var endDrag = function(e){
       if (!drag) return;
       controls.enabled = true;
       var d = drag; drag = null;
+      if ('edit' in d){ if (d.edit && e && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) applyDowelEdit(d.edit); return; }
       if (!d.moved){ state.preview = null; select(d.partName); return; }
       if (d.panel && state.preview && state.preview.value){ pushHist(); state.moves[d.name] = (state.moves[d.name] || 0) + state.preview.value; }
       state.preview = null; moveUI(); recompute();
@@ -2566,7 +2673,7 @@ function genRelief(p){
     if (state.raw.tris.length/3 > 600000) toast('Large mesh: slicing may take a few seconds.');
     remesh(true);
   }
-  function clearMoves(){ var had = Object.keys(state.moves).length + state.edits.deleted.length + state.edits.added.length; state.moves = {}; state.edits = { deleted: [], added: [] }; state.preview = null; hist = []; fut = []; histUI(); moveUI(); return had; }
+  function clearMoves(){ var had = Object.keys(state.moves).length + state.edits.deleted.length + state.edits.added.length + state.dowelEdits.added.length + state.dowelEdits.removed.length; state.moves = {}; state.edits = { deleted: [], added: [] }; state.dowelEdits = { added: [], removed: [] }; state.preview = null; hist = []; fut = []; histUI(); moveUI(); return had; }
   // Cut position: slider across the model's extent, kept in step with the mm field.
   function halfBounds(){ var m = state.model, k = +$('halfAxis').value; return m ? [m.min[k], m.max[k]] : [0, 1]; }
   function syncHalfSlider(){ var b = halfBounds(), v = num('halfPos', 0); $('halfSlider').value = Math.round(1000*(v - b[0])/Math.max(1e-9, b[1] - b[0])); }
@@ -2601,7 +2708,7 @@ function genRelief(p){
         var cut = res.parts.reduce(function(s,p){ return s + p.cut; }, 0);
         $('sParts').textContent = res.parts.length; $('sJoints').textContent = o.method !== 'stack' ? res.joints : '–';
         $('sCut').textContent = (cut/1000).toFixed(1) + ' m'; $('tparts').textContent = 'Parts (' + res.parts.length + ')';
-        $('dlAllDxf').disabled = $('dlAllSvg').disabled = !res.parts.length; nestStats(); moveUI(); snapUI();
+        $('dlAllDxf').disabled = $('dlAllSvg').disabled = !res.parts.length; nestStats(); moveUI(); snapUI(); dowelUI();
         var w = $('warns'); w.innerHTML = ''; res.warnings.forEach(function(t){ var d = document.createElement('div'); d.textContent = t; w.appendChild(d); });
       } catch (e) { console.error(e); toast('Slicing failed: ' + e.message); }
       $('busy').hidden = true;
@@ -2800,7 +2907,7 @@ function genRelief(p){
     var settings = {}, radios = {};
     railControls().forEach(function(el){ settings[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
     ['method', 'flip', 'machine'].forEach(function(n){ radios[n] = radio(n); });
-    var d = { app: '3d2cnc', version: 1, name: state.name, settings: settings, radios: radios, roles: state.roles.slice(), R: state.R.slice(), moves: state.moves, edits: state.edits };
+    var d = { app: '3d2cnc', version: 1, name: state.name, settings: settings, radios: radios, roles: state.roles.slice(), R: state.R.slice(), moves: state.moves, edits: state.edits, dowelEdits: state.dowelEdits };
     if (state.sampleKey) d.sample = state.sampleKey;
     else if (state.genParams) d.gen = state.genParams;
     else d.model = { verts: b64(new Float32Array(state.raw.verts).buffer), tris: b64(new Uint32Array(state.raw.tris).buffer),
@@ -2829,7 +2936,7 @@ function genRelief(p){
     state.roles = state.raw.bodies.map(function(_, i){ return (d.roles && d.roles[i]) || 'slice'; });
     state.R = d.R || [1,0,0,0,1,0,0,0,1]; state.name = d.name || 'project'; state.sel = null;
     remesh(true);
-    state.moves = d.moves || {}; state.edits = d.edits || { deleted: [], added: [] }; moveUI();
+    state.moves = d.moves || {}; state.edits = d.edits || { deleted: [], added: [] }; state.dowelEdits = d.dowelEdits || { added: [], removed: [] }; moveUI();
     toast('Loaded project ' + state.name + '.');
   }
   $('projFile').addEventListener('change', function(e){
