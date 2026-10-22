@@ -4,7 +4,7 @@ Turn a 3D model into flat parts that slot together, ready to cut on a CNC router
 
 3D2CNC is a browser-based take on Autodesk's discontinued 123D Make. Load an STL, OBJ or 3MF file, choose how to slice it, and export cut-ready DXF and SVG sheets. It adds the settings a real workshop needs: bit diameter, dogbones, slot clearance, laser kerf and single-stroke engraving labels.
 
-**Live tool:** https://3d2cnc.nostranger.org
+**Live tool:** https://02keilj.github.io/3d2cnc/
 
 Everything runs in your browser, so your models are never uploaded anywhere.
 
